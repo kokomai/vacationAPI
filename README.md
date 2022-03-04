@@ -1,3 +1,2 @@
 # vacationAPI
-vacation api
--with Spring Boot, Security, JWT
+vacation api -with Spring Boot, Security, JWT
