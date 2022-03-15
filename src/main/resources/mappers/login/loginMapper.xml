@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.foresys.vacationAPI.biz.login.mapper.LoginMapper">
+   <select id="getMembers" resultType="HashMap">
+	   SELECT
+			AM.MEMBER_NM,
+			AM.MEMBER_NO,
+			AM.MEMBER_POSITION_CD,
+			NVL(ZC.CODEGRP, 'C04') AS AUTH
+		FROM TB_FS_AMMEMBER AM
+		LEFT JOIN  TB_FS_ZCCODE ZC 
+		ON AM.MEMBER_NO = ZC.CODE
+		WHERE AM.MEMBER_WORK_CD != '003'
+		AND MEMBER_PW = FORESYS_CRYPTO.ENCRYPT(#{password})
+		AND MEMBER_NO = #{id}
+   </select>
+</mapper>

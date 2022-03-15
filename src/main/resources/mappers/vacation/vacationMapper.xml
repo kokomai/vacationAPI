@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.foresys.vacationAPI.biz.vacation.mapper.VacationMapper">
+   <select id="getVacationRemains" resultType="HashMap">
+		SELECT 
+			MEMBER_NO
+		    ,NVL(VACA_TOT_CNT,0) VACA_TOT_CNT
+		    ,NVL(VACA_USED_CNT,0) VACA_USED_CNT
+		    ,NVL(VACA_TOT_CNT-NVL(VACA_USED_CNT,0), 0) AS VACA_EXTRA_CNT
+		    ,VACA_YEAR
+		FROM
+		  	TB_FS_VACA_MAST VM
+		WHERE MEMBER_NO = #{id}
+		AND VACA_YEAR = #{year}
+   </select>
+   <select id="getApprovers" resultType="HashMap">
+		SELECT
+			AM.MEMBER_NM AS NM,
+		    ZC.CODE AS ID,
+		    CASE 
+		    	WHEN (CODEGRP = 'C05') THEN '01'
+		    	WHEN (CODEGRP = 'C06') THEN '02'    	
+		    ELSE '03'
+		    END AS AUTH
+		FROM 
+		    TB_FS_ZCCODE ZC, 
+		    TB_FS_AMMEMBER AM
+		WHERE
+			ZC.CODE = AM.MEMBER_NO
+		AND 
+		    CODEGRP in ('C05', 'C06', 'C07')
+		AND
+			CODE_VAL1='Y'
+		AND
+			CODE_VAL2='Y'
+		AND 
+			MEMBER_WORK_CD != '003'
+		AND 
+			MEMBER_POSITION_CD = #{department}
+   </select>
+   <select id="getHolidays" resultType="HashMap">
+	   	SELECT DATE_STD AS HOLIDAY_DATE
+		FROM TB_FA_DATE_MAST
+		WHERE DATE_YEAR  = #{year}
+		AND DATE_HOLIDAY = '3'
+		ORDER BY DATE_STD
+   </select>
+   <select id="getVacationList" resultType="HashMap">
+	   	SELECT DL.VACA_DATE,
+		L.MEMBER_NO,
+		FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
+		FN_CODENAME ('C03', L.VACA_EMAIL_SEND_STATE) AS VACA_EMAIL_SEND_STATE,
+		DL.VACA_DIV
+		FROM TB_FS_VACA_LIST L
+		JOIN TB_FS_VACA_DATE_LIST DL
+		ON L.VACA_SEQ = DL.VACA_SEQ 
+		WHERE DL.VACA_DATE  LIKE CONCAT(#{yearmonth}, '%')
+		AND L.MEMBER_NO = #{id}
+   </select>
+   
+</mapper>

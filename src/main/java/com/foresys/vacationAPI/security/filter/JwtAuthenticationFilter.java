@@ -49,14 +49,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter{
 					// access 토큰이 유효하면 토큰으로부터 유저 정보를 받아옵니다.
 					
 					Claims claims = jwtUtil.getClaims(token);
-					String username = (String) claims.get("username");
+					String id = (String) claims.get("id");
 					String password = (String) claims.get("password");
 					
 					// 새로운 Access 토큰 발행
-					token = jwtUtil.createAccessToken(username, password);
+					token = jwtUtil.createAccessToken(id, password);
 					
 					response.setHeader("X-AUTH-ATOKEN", token);
-					UserInfoDetails user = userInfoDetailService.loadUserByUsername(username);
+					UserInfoDetails user = userInfoDetailService.loadUserByUsername(id);
 					
 					UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(user.getUsername(), "", user.getAuthorities());
 	                usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
