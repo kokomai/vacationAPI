@@ -34,4 +34,23 @@ public class VacationController {
 	public List<Map<String, Object>> getVacationList(@RequestBody Map<String, Object> params) {
 		return vacationService.getVacationList(params);
 	}
+	
+	@PostMapping("/vacation/getApproveList")
+	public List<Map<String, Object>> getApproveList(@RequestBody Map<String, Object> params) {
+		return vacationService.getApproveList(params);
+	}
+	
+	@PostMapping("/vacation/getVacationInfo")
+	public Map<String, Object> getVacationInfo(@RequestBody Map<String, Object> params) {
+		return vacationService.getVacationInfo(params);
+	}
+	
+	@PostMapping("/vacation/insertVacation")
+	public int insertVacation(@RequestBody Map<String, Object> params) {
+		return vacationService.insertVacation(params);
+	}
+	@PostMapping("/vacation/cancelVacation")
+	public int cancelVacation(@RequestBody Map<String, Object> params) {
+		return vacationService.cancelVacation(params);
+	}
 }
