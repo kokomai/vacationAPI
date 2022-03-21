@@ -1,16 +1,17 @@
 # vacationAPI
 vacation api -with Spring Boot, Security, JWT
 
-## for application-local.yml
-server:
-  port: 8080
+# for application-local.yml
+~~~
+server :
+  port : 8080
 ---
-spring:
-  pid:
-    file: foresys-vacation.pid
+spring-
+  pid-
+    file- foresys-vacation.pid
 ---
-server:
-  tomcat:
+server-
+  tomcat-
     additional-tld-skip-patterns: "*.jar"
 ---
 # DB setting
@@ -24,3 +25,4 @@ spring:
 # XML location
 mybatis:
     mapper-locations: classpath:mappers/**/*.xml
+~~~
