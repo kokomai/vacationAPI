@@ -22,5 +22,6 @@ public interface VacationMapper {
 	public int deleteVacationDateList(Map<String, Object> params);
 	public int deleteVacationInsuList(Map<String, Object> params);
 	public int updateVacaUsedCount(Map<String, Object> params);
+	public int rejectVacation(Map<String, Object> params);
 	
 }

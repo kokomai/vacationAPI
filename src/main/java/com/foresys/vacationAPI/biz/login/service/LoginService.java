@@ -46,6 +46,14 @@ public class LoginService {
 			&& "1234".equals(params.get("password"))) {
 				params.put("id", "khw200302");
 				params.put("password", "lios0913");
+			} else if("12341".equals(params.get("id"))
+			&& "1234".equals(params.get("password"))) {
+				params.put("id", "test2");
+				params.put("password", "1234");
+			} else if("12342".equals(params.get("id"))
+			&& "1234".equals(params.get("password"))) {
+				params.put("id", "test3");
+				params.put("password", "a12341234");
 			}
 			
 			log.info("paramas not null :: {}", params);

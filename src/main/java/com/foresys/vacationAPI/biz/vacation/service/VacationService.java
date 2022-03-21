@@ -103,15 +103,7 @@ public class VacationService {
 		params.put("vacaSeq", vacaSeq);
 		String auth1 = (String) params.get("auth1");
 		String auth2 = (String) params.get("auth2");
-		
-		// 값이 안들어갈 경우도 있으므로 params 내에 빈 string으로 선언은 해준다.
-		params.put("vacaApprvId", "");
-		params.put("vacaApprvReqId", "");
-		params.put("vacaApprvId2", "");
-		params.put("vacaApprvReqId2", "");
-		params.put("vacaApprvId3", "");
-		params.put("vacaApprvReqId3", "");
-		
+				
 		if("01".equals(auth1)) {
 			params.put("vacaApprvId", (String) params.get("auth1Nm"));
 			params.put("vacaApprvReqId", (String) params.get("auth1Id"));
@@ -164,6 +156,17 @@ public class VacationService {
 			}
 		} catch(Exception e) {
 			log.info("deleteVacation error :::: ", e);
+			return 0;
+		}
+		
+		return 1;
+	}
+	
+	public int rejectVacation(Map<String, Object> params) {
+		try {
+			vacationMapper.rejectVacation(params);
+		} catch(Exception e) {
+			log.info("rejectVacation error :::: ", e);
 			return 0;
 		}
 		

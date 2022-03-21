@@ -49,8 +49,14 @@ public class VacationController {
 	public int insertVacation(@RequestBody Map<String, Object> params) {
 		return vacationService.insertVacation(params);
 	}
+	
 	@PostMapping("/vacation/cancelVacation")
 	public int cancelVacation(@RequestBody Map<String, Object> params) {
 		return vacationService.cancelVacation(params);
+	}
+	
+	@PostMapping("/vacation/rejectVacation")
+	public int rejectVacation(@RequestBody Map<String, Object> params) {
+		return vacationService.rejectVacation(params);
 	}
 }
