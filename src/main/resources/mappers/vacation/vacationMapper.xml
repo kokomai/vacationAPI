@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.foresys.vacationAPI.biz.vacation.mapper.VacationMapper">
+	<select id="getRequestCount" resultType="double">
+		SELECT NVL(SUM(USED), 0) AS COUNT
+		FROM (
+			SELECT 
+				CASE WHEN VACA_DIV = '01' THEN 1
+				ELSE 0.5 END AS USED
+			FROM 
+				TB_FS_VACA_DATE_LIST DL,
+				TB_FS_VACA_LIST L
+			WHERE
+				L.VACA_SEQ = DL.VACA_SEQ 
+			AND
+				L.MEMBER_NO = #{id}
+			AND L.VACA_STATE IN ('52','02', '62', '72', '53')
+			AND L.VACA_SEQ LIKE CONCAT(#{year}, '%')
+		)
+	</select>
+	<select id="getVacationRemains" resultType="HashMap">
+		SELECT 
+			MEMBER_NO
+		    ,NVL(VACA_TOT_CNT,0) VACA_TOT_CNT
+		    ,NVL(VACA_USED_CNT,0) VACA_USED_CNT
+		    ,NVL(VACA_TOT_CNT-NVL(VACA_USED_CNT,0), 0) AS VACA_EXTRA_CNT
+		    ,VACA_YEAR
+		FROM
+		  	TB_FS_VACA_MAST VM
+		WHERE 
+			MEMBER_NO = #{id}
+		AND 
+			VACA_YEAR = #{year}
+   	</select>
+   <select id="getApprovers" resultType="HashMap">
+		SELECT
+			AM.MEMBER_NM AS NM,
+		    ZC.CODE AS ID,
+		    CASE 
+		    	WHEN (CODEGRP = 'C05') THEN '01'
+		    	WHEN (CODEGRP = 'C06') THEN '02'    	
+		    ELSE '03'
+		    END AS AUTH
+		FROM 
+		    TB_FS_ZCCODE ZC, 
+		    TB_FS_AMMEMBER AM
+		WHERE
+			ZC.CODE = AM.MEMBER_NO
+		AND 
+		    CODEGRP in ('C05', 'C06', 'C07')
+		AND
+			CODE_VAL1='Y'
+		AND
+			CODE_VAL2='Y'
+		AND 
+			MEMBER_WORK_CD != '003'
+		AND 
+			MEMBER_POSITION_CD = #{department}
+   	</select>
+   	<select id="getHolidays" resultType="HashMap">
+	   	SELECT 
+	   		DATE_STD AS HOLIDAY_DATE
+		FROM 
+			TB_FA_DATE_MAST
+		WHERE 
+			DATE_YEAR  = #{year}
+		AND 
+			DATE_HOLIDAY = '3'
+		ORDER BY 
+			DATE_STD
+   	</select>
+   	<select id="getVacationList" resultType="HashMap">
+	   	SELECT 
+	   		DL.VACA_DATE,
+			L.MEMBER_NO,
+			FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
+			FN_CODENAME ('C03', L.VACA_EMAIL_SEND_STATE) AS VACA_EMAIL_SEND_STATE,
+			L.VACA_SEQ,
+			DL.VACA_DIV
+		FROM 
+			TB_FS_VACA_LIST L,
+			TB_FS_VACA_DATE_LIST DL
+		WHERE 
+			L.VACA_SEQ = DL.VACA_SEQ 
+		AND
+			DL.VACA_DATE  LIKE CONCAT(#{yearmonth}, '%')
+		AND 
+			L.MEMBER_NO = #{id}
+   	</select>
+   	<select id="getVacationInfo" resultType="HashMap">
+	   	SELECT *
+		FROM(
+	   		SELECT 
+	   			L.VACA_SEQ,
+				DL.VACA_DATE,
+				CASE 
+					WHEN L.VACA_APPRV_ID IS NULL THEN NULL 
+					ELSE CONCAT(L.VACA_APPRV_ID, CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID), ')'))
+				END AS APPRV1,
+				CASE 
+					WHEN L.VACA_APPRV_ID2 IS NULL THEN NULL 
+					ELSE CONCAT(L.VACA_APPRV_ID2, CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID2), ')'))
+				END AS APPRV2,
+				CASE 
+					WHEN L.VACA_APPRV_ID3 IS NULL THEN NULL 
+					ELSE CONCAT(L.VACA_APPRV_ID3, CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID3), ')'))
+				END AS APPRV3,
+				FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
+				FN_CODENAME ('C03', L.VACA_EMAIL_SEND_STATE) AS VACA_EMAIL_SEND_STATE,
+				FN_CODENAME ('C04', DL.VACA_DIV) AS VACA_DIV,
+				L.VACA_REASON,
+				INSU.VACA_INSU,
+				INSU.VACA_INSU_UPMU,
+				L.VACA_CRE_DATE,
+				L.VACA_REJECT_REASON,
+				ROW_NUMBER() OVER (PARTITION BY L.VACA_SEQ ORDER BY L.VACA_CRE_DATE DESC) AS RN 
+			FROM 
+				TB_FS_VACA_LIST L,
+				TB_FS_VACA_DATE_LIST DL,
+				TB_FS_VACA_INSU_LIST INSU
+			WHERE 
+				L.VACA_SEQ = DL.VACA_SEQ 
+			AND		
+				L.VACA_SEQ = INSU.VACA_SEQ(+)
+			AND
+				L.VACA_SEQ = #{seq}
+			AND 
+				DL.VACA_DATE = #{date}
+			AND 
+				L.MEMBER_NO = #{id}
+		) T
+		WHERE T.RN = 1
+   	</select>
+   	<select id="getApproveList" resultType="HashMap">
+		SELECT 
+			VACA_SEQ,
+			MAX(REQUESTER) AS REQUESTER,
+			LISTAGG(VACA_DATE ||'(' || VACA_DIV || ')', '/') WITHIN GROUP (ORDER BY VACA_DATE) AS VACA_DATES,
+			MAX(VACA_REASON) AS REASON,
+			MAX(VACA_INSU) AS VACA_INSU,
+			MAX(VACA_INSU_UPMU) AS VACA_INSU_UPMU,
+			MAX(VACA_STATE) AS VACA_STATE,
+			MAX(REQUEST_DATE) AS REQUEST_DATE,
+			MAX(VACA_EXTRA_CNT) AS EXTRA_COUNT,
+			MAX(USE_CNT) AS USE_CNT,
+			MAX(VACA_EXTRA_CNT - USE_CNT) AS AFTER_CNT
+		FROM
+		(
+			SELECT 
+				L.VACA_SEQ,
+				CONCAT(AM.MEMBER_NM, CONCAT(CONCAT('(', AM.MEMBER_NO), ')')) AS REQUESTER,
+				DL.VACA_DATE,
+				FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
+				FN_CODENAME ('C04', DL.VACA_DIV) AS VACA_DIV,
+				INSU.VACA_INSU,
+				INSU.VACA_INSU_UPMU,
+				L.VACA_REASON,
+				L.VACA_CRE_DATE AS REQUEST_DATE,
+			    NVL(MAST.VACA_TOT_CNT-NVL(VACA_USED_CNT,0), 0) AS VACA_EXTRA_CNT,
+			    (SELECT 
+			    	SUM(CASE 
+						WHEN VACA_DIV = '01' THEN 1
+						ELSE 0.5 END)
+				 FROM TB_FS_VACA_DATE_LIST
+				 WHERE VACA_SEQ = L.VACA_SEQ) AS USE_CNT
+			FROM 
+				TB_FS_VACA_LIST L,
+				TB_FS_VACA_DATE_LIST DL,
+				TB_FS_VACA_INSU_LIST INSU,
+				TB_FS_AMMEMBER AM,
+				TB_FS_VACA_MAST MAST
+			WHERE
+				L.VACA_SEQ = DL.VACA_SEQ
+			AND
+				L.VACA_SEQ = INSU.VACA_SEQ(+)
+			AND
+				L.MEMBER_NO = AM.MEMBER_NO
+			AND
+				L.MEMBER_NO = MAST.MEMBER_NO
+			AND 
+				(L.VACA_APPRV_REQ_ID = #{id}
+				OR L.VACA_APPRV_REQ_ID2 = #{id} 
+				OR L.VACA_APPRV_REQ_ID3 = #{id})
+			AND
+				MAST.VACA_YEAR = #{year}
+			<choose>
+				<when test="'C05'.equals(auth)">
+				AND
+					VACA_STATE = '02'
+				</when>
+				<when test="'C06'.equals(auth)">
+				AND
+					CASE 
+						WHEN VACA_APPRV_REQ_ID IS NULL AND VACA_STATE = '02' THEN 1
+						WHEN VACA_APPRV_REQ_ID IS NOT NULL AND VACA_STATE = '62' THEN 1
+						ELSE 0 
+					END = 1
+				</when>
+				<when test="'C07'.equals(auth)">
+				AND
+					CASE 
+						WHEN VACA_APPRV_REQ_ID2 IS NULL AND VACA_STATE = '02' THEN 1
+						WHEN VACA_APPRV_REQ_ID2 IS NOT NULL AND VACA_STATE = '72' THEN 1
+						ELSE 0 
+					END = 1
+				</when>
+			</choose>
+		) A
+		GROUP BY VACA_SEQ
+   	</select>
+   	<select id="getVacaSeq" resultType="String">
+   		SELECT TO_CHAR(sysdate,'YYYY') || LPAD(NVL(SUBSTR(MAX(VACA_SEQ),5), 0),4,'0')+1 
+   		FROM TB_FS_VACA_LIST
+   	</select>
+   	<insert id="insertVacationList">
+		INSERT INTO TB_FS_VACA_LIST( 
+			VACA_SEQ
+			,MEMBER_NO
+			,VACA_REASON
+			<if test="vacaApprvId != null">
+			,VACA_APPRV_ID
+			</if>
+			<if test="vacaApprvReqId != null">
+			,VACA_APPRV_REQ_ID
+			</if>
+			<if test="vacaApprvId2 != null">
+			,VACA_APPRV_ID2
+			</if>
+			<if test="vacaApprvReqId2 != null">
+			,VACA_APPRV_REQ_ID2
+			</if>
+			<if test="vacaApprvId3 != null">
+			,VACA_APPRV_ID3
+			</if>
+			<if test="vacaApprvReqId3 != null">
+			,VACA_APPRV_REQ_ID3
+			</if>
+			,VACA_CHG_DT
+			,VACA_EMERGENCY_CALL
+		)
+		VALUES( 
+			#{vacaSeq}
+			, #{id}
+			, #{reason}
+			<if test="vacaApprvId != null">
+			, #{vacaApprvId}
+			</if>
+			<if test="vacaApprvReqId != null">
+			, #{vacaApprvReqId}
+			</if>
+			<if test="vacaApprvId2 != null">
+			, #{vacaApprvId2}
+			</if>
+			<if test="vacaApprvReqId2 != null">
+			, #{vacaApprvReqId2}
+			</if>
+			<if test="vacaApprvId3 != null">
+			, #{vacaApprvId3}
+			</if>
+			<if test="vacaApprvReqId3 != null">
+			, #{vacaApprvReqId3}
+			</if>
+			, TO_CHAR(sysdate, 'YYYYMMDD')
+			, (SELECT MEMBER_TEL_NO FROM TB_FS_AMMEMBER WHERE MEMBER_NO= #{id})
+		)
+	</insert>
+	<insert id="insertVacationDateList">
+   		INSERT INTO TB_FS_VACA_DATE_LIST(
+			VACA_SEQ
+			,VACA_DIV
+			,VACA_DATE
+		)
+		VALUES(
+			#{vacaSeq}
+			,#{VACA_DIV}
+			,#{VACA_DATE}
+		)
+   	</insert>
+	<insert id="insertVacationInsuList">
+		INSERT INTO TB_FS_VACA_INSU_LIST(
+			INSU_SEQ
+			,VACA_SEQ
+			,VACA_MEMBER_NO
+			,VACA_INSU
+			,VACA_INSU_UPMU
+		)
+		VALUES(
+			LPAD((SELECT NVL(MAX(TO_NUMBER(INSU_SEQ)),0)+1  FROM TB_FS_VACA_INSU_LIST), 4,'0')
+			,#{vacaSeq}
+			,#{id}
+			,#{handoverPerson}
+			,#{handoverText}
+		)
+	</insert>
+	<delete id="deleteVacationList">
+		DELETE
+		FROM
+			TB_FS_VACA_LIST
+		WHERE
+			VACA_SEQ=#{vacaSeq}
+	</delete>
+	<delete id="deleteVacationDateList">
+		DELETE
+		FROM
+			TB_FS_VACA_DATE_LIST
+		WHERE
+			VACA_SEQ=#{vacaSeq}
+	</delete>
+	<delete id="deleteVacationInsuList">
+		DELETE
+		FROM
+			TB_FS_VACA_INSU_LIST
+		WHERE
+			VACA_SEQ=#{vacaSeq}
+	</delete>
+	<update id="updateVacaUsedCount">
+		UPDATE TB_FS_VACA_MAST
+		SET 
+			VACA_USED_CNT=#{usedCount},
+			VACA_CHG_ID=#{chngId},
+			VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
+		WHERE
+			MEMBER_NO=#{id}
+		AND 
+			VACA_YEAR=#{year}
+	</update>
+	<update id="rejectVacation">
+		UPDATE TB_FS_VACA_LIST
+		SET 
+			VACA_STATE='04',
+			VACA_REJECT_REASON=#{reason},
+			VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
+		WHERE
+			VACA_SEQ=#{vacaSeq}
+	</update>
+</mapper>
