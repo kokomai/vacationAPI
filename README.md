@@ -1,7 +1,7 @@
 # vacationAPI
 vacation api -with Spring Boot, Security, JWT
 
-# for application-local.yml
+# for application-local.yml (src/resources/application-local.yml)
 ~~~
 server :
   port : 8080
@@ -10,8 +10,8 @@ spring-
   pid-
     file- foresys-vacation.pid
 ---
-server-
-  tomcat-
+server:
+  tomcat:
     additional-tld-skip-patterns: "*.jar"
 ---
 # DB setting
