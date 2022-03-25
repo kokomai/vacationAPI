@@ -137,6 +137,7 @@
 		SELECT 
 			VACA_SEQ,
 			MAX(REQUESTER) AS REQUESTER,
+			MAX(REQUESTER_ID) AS REQUESTER_ID,
 			LISTAGG(VACA_DATE ||'(' || VACA_DIV || ')', '/') WITHIN GROUP (ORDER BY VACA_DATE) AS VACA_DATES,
 			MAX(VACA_REASON) AS REASON,
 			MAX(VACA_INSU) AS VACA_INSU,
@@ -151,6 +152,7 @@
 			SELECT 
 				L.VACA_SEQ,
 				CONCAT(AM.MEMBER_NM, CONCAT(CONCAT('(', AM.MEMBER_NO), ')')) AS REQUESTER,
+				AM.MEMBER_NO AS REQUESTER_ID,
 				DL.VACA_DATE,
 				FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
 				FN_CODENAME ('C04', DL.VACA_DIV) AS VACA_DIV,
@@ -194,7 +196,7 @@
 				AND
 					CASE 
 						WHEN VACA_APPRV_REQ_ID IS NULL AND VACA_STATE = '02' THEN 1
-						WHEN VACA_APPRV_REQ_ID IS NOT NULL AND VACA_STATE = '62' THEN 1
+						WHEN VACA_APPRV_REQ_ID IS NOT NULL AND VACA_STATE = '53' THEN 1
 						ELSE 0 
 					END = 1
 				</when>
@@ -202,7 +204,7 @@
 				AND
 					CASE 
 						WHEN VACA_APPRV_REQ_ID2 IS NULL AND VACA_STATE = '02' THEN 1
-						WHEN VACA_APPRV_REQ_ID2 IS NOT NULL AND VACA_STATE = '72' THEN 1
+						WHEN VACA_APPRV_REQ_ID2 IS NOT NULL AND VACA_STATE = '53' THEN 1
 						ELSE 0 
 					END = 1
 				</when>
@@ -322,7 +324,7 @@
 			VACA_CHG_ID=#{chngId},
 			VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
 		WHERE
-			MEMBER_NO=#{id}
+			MEMBER_NO=#{requesterId}
 		AND 
 			VACA_YEAR=#{year}
 	</update>
@@ -331,6 +333,50 @@
 		SET 
 			VACA_STATE='04',
 			VACA_REJECT_REASON=#{reason},
+			VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
+		WHERE
+			VACA_SEQ=#{vacaSeq}
+	</update>
+	<select id="getApprovalState" resultType="String">
+		SELECT 
+			CASE 
+			-- 2차승인자가 있고, USER가 1차 승인자인 경우 -> 1차 승인
+			WHEN AUTH2 IS NOT NULL AND AUTH1 = #{id} THEN '53'
+			-- 2차승인자가 없고, USER가 1차 승인자인 경우 -> 승인
+			WHEN AUTH2 IS NULL AND AUTH1 = #{id} THEN '03'
+			-- 1차승인자가 없고, 3차승인자가 등록되어 있으며, USER가 2차 승인자인 경우 -> 1차 승인
+			WHEN AUTH1 IS NULL AND AUTH3 IS NOT NULL AND AUTH2 = #{id} THEN '53'
+			-- 1차승인자가 있고, USER가 2차승인자인 경우 -> 승인
+			WHEN AUTH1 IS NOT NULL AND AUTH2 = #{id} THEN '03'
+			-- 1차,3차승인자가 없고, USER가 2차승인자인 경우 -> 승인
+			WHEN AUTH1 IS NULL AND AUTH3 IS NULL AND AUTH2 = #{id} THEN '03'
+			-- USER가 3차 승인자인 경우 -> 승인
+			WHEN AUTH3 = #{id} THEN '03'
+			END AS STATE
+		FROM (
+			SELECT
+				VACA_APPRV_REQ_ID AS AUTH1,
+				VACA_APPRV_REQ_ID2 AS AUTH2,
+				VACA_APPRV_REQ_ID3 AS AUTH3
+			FROM TB_FS_VACA_LIST
+			WHERE VACA_SEQ = #{vacaSeq}
+		)
+	</select>
+	<select id="getUsedVacationCount" resultType="double">
+		SELECT NVL(SUM(USED), 0) AS COUNT
+		FROM (
+			SELECT 
+				CASE WHEN VACA_DIV = '01' THEN 1
+				ELSE 0.5 END AS USED
+			FROM 
+				TB_FS_VACA_DATE_LIST
+			WHERE VACA_SEQ = #{vacaSeq}
+		)
+	</select>
+	<update id="approveVacation">
+		UPDATE TB_FS_VACA_LIST
+		SET 
+			VACA_STATE=#{state},
 			VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
 		WHERE
 			VACA_SEQ=#{vacaSeq}

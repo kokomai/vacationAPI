@@ -59,4 +59,9 @@ public class VacationController {
 	public int rejectVacation(@RequestBody Map<String, Object> params) {
 		return vacationService.rejectVacation(params);
 	}
+	
+	@PostMapping("/vacation/approveVacation")
+	public int approveVacation(@RequestBody Map<String, Object> params) {
+		return vacationService.approveVacation(params);
+	}
 }

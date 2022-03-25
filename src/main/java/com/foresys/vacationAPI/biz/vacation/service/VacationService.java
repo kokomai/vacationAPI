@@ -21,6 +21,11 @@ public class VacationService {
 	@Autowired
 	VacationMapper vacationMapper;
 	
+	/**
+	 * 유저의 휴가 남은 일자 조회
+	 * @param params
+	 * @return
+	 */
 	public Map<String, Object> getVacationRemains(Map<String, Object> params) {
 		// 서버 현재 연도를 넣어줌
 		params.put("year", Integer.toString(LocalDate.now().getYear()));
@@ -41,6 +46,14 @@ public class VacationService {
 		return result;
 	}
 	
+	/**
+	 * 휴가 승인자 리스트 권한별로 가져와서 셋팅
+	 * C04 -> 1차 : C05 / 2차 : C06 
+	 * C05 -> 1차 : C06 / 2차 : C07 
+	 * C06 -> 1차 : C07 
+	 * @param params
+	 * @return
+	 */
 	public Map<String, Object> getApprovers(Map<String, Object> params) {
 		List<Map<String, Object>> sqlResult = vacationMapper.getApprovers(params);
 		Map<String, Object> result = new HashMap<String, Object>();
@@ -75,26 +88,51 @@ public class VacationService {
 		return result;
 	}
 	
+	/**
+	 * 휴일을 가져옴 (휴일은 휴가를 쓸 필요가 없기에 달력에 표시)
+	 * @param params
+	 * @return
+	 */
 	public List<Map<String, Object>> getHolidays(Map<String, Object> params) {
 		// 서버 현재 연도를 넣어줌
 		params.put("year", Integer.toString(LocalDate.now().getYear()));
 		return vacationMapper.getHolidays(params);
 	}
 	
+	/**
+	 * 유저의 신청, 승인, 반려된 휴가 리스트들을 가져옴 
+	 * @param params
+	 * @return
+	 */
 	public List<Map<String, Object>> getVacationList(Map<String, Object> params) {
 		return vacationMapper.getVacationList(params);
 	}
 	
+	/**
+	 * C05이상의 권한자의 휴가승인 리스트를 가져옴(부하직원이 신청한 휴가 목록 승인/반려를 위해 가져옴) 
+	 * @param params
+	 * @return
+	 */
 	public List<Map<String, Object>> getApproveList(Map<String, Object> params) {
 		// 서버 현재 연도를 넣어줌
 		params.put("year", Integer.toString(LocalDate.now().getYear()));
 		return vacationMapper.getApproveList(params);
 	}
 	
+	/**
+	 * 신청한 휴가의 자세한 정보를 가져옴 
+	 * @param params
+	 * @return
+	 */
 	public Map<String, Object> getVacationInfo(Map<String, Object> params) {
 		return vacationMapper.getVacationInfo(params);
 	}
 	
+	/**
+	 * 휴가 신청 프로세스
+	 * @param params
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public int insertVacation(Map<String, Object> params) {
 		ArrayList<Map<String, Object>> list = (ArrayList<Map<String, Object>>) params.get("selectedDate");
@@ -146,6 +184,11 @@ public class VacationService {
 		return 1;
 	}
 	
+	/**
+	 * 유저가 휴가를 취소할 때의 프로세스
+	 * @param params
+	 * @return
+	 */
 	public int cancelVacation(Map<String, Object> params) {
 		try {
 			int result1 = vacationMapper.deleteVacationDateList(params);
@@ -162,11 +205,70 @@ public class VacationService {
 		return 1;
 	}
 	
+	/**
+	 * 휴가 승인자가(C05권한 이상) 신청된 휴가를 반려시킬 때의 프로세스
+	 * @param params
+	 * @return
+	 */
 	public int rejectVacation(Map<String, Object> params) {
 		try {
 			vacationMapper.rejectVacation(params);
 		} catch(Exception e) {
 			log.info("rejectVacation error :::: ", e);
+			return 0;
+		}
+		
+		return 1;
+	}
+	
+	/**
+	 * 휴가 승인자가(C05권한 이상) 신청된 휴가를 승인할 때의 프로세스
+	 * @param params
+	 * @return
+	 */
+	public int approveVacation(Map<String, Object> params) {
+		try {
+			
+			// 몇차 결재자인지 조회해서 state값을 받아옴
+			String state = vacationMapper.getApprovalState(params);
+			params.put("state", state);
+			log.info("PARAMS :::: {}", params);
+			
+			// 이 휴가승인이 최종 승인인 경우 휴가 갯수를 깎음
+			if("03".equals(state)) {
+				params.put("year", ((String) params.get("vacaSeq")).substring(0, 5));
+				log.info("year PARAMS :::: {}", params);
+				Map<String, Object> remainsMap = vacationMapper.getVacationRemains(params);
+				// 요청자의 실제 남은 휴가 갯수
+				double remainsCount = (double) remainsMap.get("VACA_USED_CNT");
+				// 요청자가 신청한 휴가 갯수
+				double requestCount = vacationMapper.getUsedVacationCount(params);
+				double usedCount = remainsCount - requestCount;
+				
+				params.put("usedCount", usedCount);
+				params.put("chngId", params.get("id"));
+				
+				// TODO 03 휴가 깎는것, insert 계쏙 구현 해야 함
+				// TODO sms / mail 전송 또한..
+				/*
+				UPDATE TB_FS_VACA_MAST
+				SET 
+					VACA_USED_CNT=#{usedCount},
+					VACA_CHG_ID=#{chngId},
+					VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
+				WHERE
+					MEMBER_NO=#{requesterId}
+				AND 
+					VACA_YEAR=#{year}
+				*/
+				
+				log.info("usedCount PARAMS :::: {}", params);
+//				vacationMapper.updateVacaUsedCount(params);
+			}
+			
+//			vacationMapper.approveVacation(params);
+		} catch(Exception e) {
+			log.info("approveVacation error :::: ", e);
 			return 0;
 		}
 		
