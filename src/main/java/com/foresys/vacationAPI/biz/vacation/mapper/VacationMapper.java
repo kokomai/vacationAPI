@@ -46,4 +46,10 @@ public interface VacationMapper {
 	public double getUsedVacationCount(Map<String, Object> params);
 	// 신청된 휴가의 상태를 "승인, 1차 승인"등으로 갱신
 	public int approveVacation(Map<String, Object> params);
+	// 취소할 휴가의 상태(승인여부)를 가져옴
+	public String getVacationState(Map<String, Object> params);
+	// 승인자의 sms를 가져옴
+	public String getApproverTelNo(Map<String, Object> params);
+	// 승인자의 email을 가져옴
+	public String getApproverEmail(Map<String, Object> params);
 }

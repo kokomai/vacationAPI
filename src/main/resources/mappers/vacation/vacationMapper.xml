@@ -381,4 +381,27 @@
 		WHERE
 			VACA_SEQ=#{vacaSeq}
 	</update>
+	<select id="getVacationState" resultType="String">
+		SELECT 
+			VACA_STATE
+		FROM 
+			TB_FS_VACA_LIST
+		WHERE VACA_SEQ = #{vacaSeq}
+	</select>
+	<select id="getApproverTelNo" resultType="String">
+		SELECT
+			MEMBER_TEL_NO
+		FROM
+			TB_FS_AMMEMBER
+		WHERE
+			MEMBER_NO= #{approverId}
+	</select>
+	<select id="getApproverEmail" resultType="String">
+	SELECT
+		MEMBER_EMAIL
+	FROM
+		TB_FS_AMMEMBER
+	WHERE
+		MEMBER_NO=#CONFIRM_CHK#
+	</select>
 </mapper>

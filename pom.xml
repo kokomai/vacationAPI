@@ -67,6 +67,12 @@
 		    <groupId>org.glassfish.jaxb</groupId>
 		    <artifactId>jaxb-runtime</artifactId>
 		</dependency>
+		<!-- mail API -->
+		<dependency>
+		    <groupId>javax.mail</groupId>
+		    <artifactId>mail</artifactId>
+		    <version>1.4.2</version>
+		</dependency>
 	</dependencies>
 
 	<build>
