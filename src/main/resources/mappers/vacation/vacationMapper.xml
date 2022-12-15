@@ -394,14 +394,65 @@
 		FROM
 			TB_FS_AMMEMBER
 		WHERE
-			MEMBER_NO= #{approverId}
+			MEMBER_NO = #{approverId}
 	</select>
 	<select id="getApproverEmail" resultType="String">
-	SELECT
-		MEMBER_EMAIL
-	FROM
-		TB_FS_AMMEMBER
-	WHERE
-		MEMBER_NO=#CONFIRM_CHK#
+		SELECT
+			MEMBER_EMAIL
+		FROM
+			TB_FS_AMMEMBER
+		WHERE
+			MEMBER_NO = #{approverId}
 	</select>
+	<update id="updateEmail">
+		UPDATE TB_FS_VACA_LIST 
+		SET
+			VACA_EMAIL_SEND_STATE = #{vacaEmailSendState}
+		WHERE
+			VACA_SEQ = #{vacaSeq}
+	</update>
+	<select id="getRequestVacationList" resultType="HashMap">
+		SELECT 
+			DL.VACA_DATE,
+			L.VACA_SEQ,
+			DL.VACA_DIV,
+			M.MEMBER_NO,
+			M.MEMBER_NM,
+			L.VACA_REASON,
+			FN_CODENAME('009',M.MEMBER_CLASS_CD) AS MEMBER_CLASS_CD_NM,
+			L.VACA_CRE_DATE 
+		FROM 
+			TB_FS_VACA_LIST L,
+			TB_FS_VACA_DATE_LIST DL,
+			TB_FS_AMMEMBER M
+		WHERE 
+			L.VACA_SEQ = DL.VACA_SEQ
+		AND
+			L.MEMBER_NO  = M.MEMBER_NO 
+		AND 
+			L.VACA_SEQ = #{vacaSeq}
+		ORDER BY VACA_DATE ASC
+   	</select>
+   	<select id="getApproverId" resultType="HashMap">
+		SELECT 
+			DL.VACA_DATE,
+			L.VACA_SEQ,
+			DL.VACA_DIV,
+			M.MEMBER_NO,
+			M.MEMBER_NM,
+			L.VACA_REASON,
+			FN_CODENAME('009',M.MEMBER_CLASS_CD) AS MEMBER_CLASS_CD_NM,
+			L.VACA_CRE_DATE 
+		FROM 
+			TB_FS_VACA_LIST L,
+			TB_FS_VACA_DATE_LIST DL,
+			TB_FS_AMMEMBER M
+		WHERE 
+			L.VACA_SEQ = DL.VACA_SEQ
+		AND
+			L.MEMBER_NO  = M.MEMBER_NO 
+		AND 
+			L.VACA_SEQ = #{vacaSeq}
+		ORDER BY VACA_DATE ASC
+   	</select>
 </mapper>

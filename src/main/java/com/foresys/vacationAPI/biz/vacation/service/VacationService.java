@@ -3,9 +3,11 @@ package com.foresys.vacationAPI.biz.vacation.service;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,12 +52,12 @@ public class VacationService {
 		
 		Map<String, Object> result = vacationMapper.getVacationRemains(params);
 		
-		if(result != null && result.get("VACA_USED_CNT") != null && result.get("VACA_EXTRA_CNT") != null) {
+		if(result != null && result.get("VACA_USED_CNT") != null && result.get("remainCount_CNT") != null) {
 			double usedCnt =  ((BigDecimal) result.get("VACA_USED_CNT")).doubleValue();
-			double extraCnt = ((BigDecimal) result.get("VACA_EXTRA_CNT")).doubleValue();
+			double extraCnt = ((BigDecimal) result.get("remainCount_CNT")).doubleValue();
 			// 사용자에게 표시될 때는 신청 갯수도 계산해서..
 			result.put("VACA_USED_CNT", usedCnt + reqCnt);
-			result.put("VACA_EXTRA_CNT", extraCnt - reqCnt);
+			result.put("remainCount_CNT", extraCnt - reqCnt);
 		}
 		
 		return result;
@@ -156,7 +158,8 @@ public class VacationService {
 		params.put("vacaSeq", vacaSeq);
 		String auth1 = (String) params.get("auth1");
 		String auth2 = (String) params.get("auth2");
-				
+		
+
 		if("01".equals(auth1)) {
 			params.put("vacaApprvId", (String) params.get("auth1Nm"));
 			params.put("vacaApprvReqId", (String) params.get("auth1Id"));
@@ -189,6 +192,19 @@ public class VacationService {
 				}
 				
 				vacationMapper.insertVacationInsuList(params);
+				
+				
+				if(params.get("auth1Id") != null && !"".equals(params.get("auth1Id"))) {
+					// 1차 승인자 있을 시, 1차 승인자에게 메일 발송
+					params.put("approverId", params.get("auth1Id"));
+				} else {
+					// 1차 승인자 없을 시, 2차 승인자에게 메일 발송
+					params.put("approverId", params.get("auth2Id"));
+				}
+				
+				// mailKind = [02 : 신청], [03 : 휴가 승인되어 완료], [06 : 승인 후 휴가신청 취소] 휴가 상태 코드(C02)를 따름
+				params.put("mailKind", "02");
+				sendMail(params);
 			}
 			
 		} catch(Exception e) {
@@ -229,6 +245,9 @@ public class VacationService {
 				
 				log.info("usedCount PARAMS :::: {}", params);
 				vacationMapper.updateVacaUsedCount(params);
+				
+				// TODO : 취소 전체 메일 공지
+				
 			}
 			
 			int result1 = vacationMapper.deleteVacationDateList(params);
@@ -275,8 +294,9 @@ public class VacationService {
 			params.put("state", state);
 			log.info("PARAMS :::: {}", params);
 			
-			// 이 휴가승인이 최종 승인인 경우 휴가 갯수를 깎음
 			if("03".equals(state)) {
+				// 이 휴가승인이 최종 승인인 경우 휴가 갯수를 깎고 공지 메일을 보냄
+				
 				// 년도 정보를 가져오기 위해..
 				params.put("year", ((String) params.get("vacaSeq")).substring(0, 4));
 				
@@ -299,9 +319,21 @@ public class VacationService {
 				
 				log.info("usedCount PARAMS :::: {}", params);
 				vacationMapper.updateVacaUsedCount(params);
+				
+				// TODO : 전체 메일 공지
+				// mailKind = [02 : 신청], [03 : 휴가 승인되어 완료], [06 : 승인 후 휴가신청 취소] 휴가 상태 코드(C02)를 따름
+				params.put("mailKind", "03");
+			} else {
+				// 이 휴가승인이 중간 승인인 경우 다음 신청 메일을 보냄
+				
+				// TODO : 다음 2차 승인자에게 메일 공지
+				// mailKind = [02 : 신청], [03 : 휴가 승인되어 완료], [06 : 승인 후 휴가신청 취소] 휴가 상태 코드(C02)를 따름
+				params.put("mailKind", "02");
+				params.put("approverId", params.get("auth1Id"));
 			}
 			
 			vacationMapper.approveVacation(params);
+			sendMail(params);
 		} catch(Exception e) {
 			log.info("approveVacation error :::: ", e);
 			return 0;
@@ -318,191 +350,170 @@ public class VacationService {
 	 */
 	private static class SMTPAuthenticator extends javax.mail.Authenticator {
 		  public PasswordAuthentication getPasswordAuthentication() {
-		   return new PasswordAuthentication("foresys00", "foresys1"); // Google id, pwd, 주의) @gmail.com 은 제외하세요
+		   return new PasswordAuthentication("foresys@foresys.co.kr", "foresys#@1"); 
 		  }
 	 }
 	
-//	/**
-//	 * 신청, 최종승인, 취소시 메일 보내기
-//	 * @param param
-//	 */
-//	public void sendMail(HashMap<String, Object> params)  { 
-//		//("foresys00", "foresys1");
-//		String host = "smtp.gmail.com";  
-//		String subj="";
-//		String applysubj, completesubj;
-//		String content="";
-//		String applycontent, completecontent;
-//		String vaca_date;
-//		String vaca_half;
-//		String CONFIRM_CHK_EMAIL;
-//		String to_email = "";
-//    	Properties p = new Properties();
-//    	  p.put("mail.smtp.user", "foresys00@gmail.com");
-//    	  p.put("mail.smtp.host", "smtp.gmail.com");
-//    	  p.put("mail.smtp.port", "465");
-//    	  p.put("mail.smtp.starttls.enable","true");
-//    	  p.put( "mail.smtp.auth", "true");
-//
-//    	  p.put("mail.smtp.debug", "true");
-//    	  p.put("mail.smtp.socketFactory.port", "465"); 
-//    	  p.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory"); 
-//    	  p.put("mail.smtp.socketFactory.fallback", "false");
-//        
-//        String member_no = params.get("MEMBER_NO") + "";
-//        String member_nm = params.get("MEMBER_NM") + "";
-//        String member_class_cd = params.get("MEMBER_CLASS_CD") + "";
-//        String[] vaca_d = (params.get("VACA_DATE") == null) ? null : (String[]) params.get("VACA_DATE");
-//    	vaca_date = Arrays.toString(vaca_d);
-//        	
-//        String[] vaca_h = (params.get("VACA_HALF") == null) ? null :(String[]) params.get("VACA_HALF");
-//    	vaca_half = Arrays.toString(vaca_h);
-//    	
-//        String vaca_num = params.get("VACA_NUM") + "";
-//        String vaca_extra = params.get("VACA_EXTRA_CAL") + "";
-//        String vaca_reason = params.get("VACA_REASON") + "";
-//        String vaca_credate = params.get("VACA_CREDATE") + "";
-//        String confirm_chk_member = params.get("CONFIRM_CHK") + "";
-//        double vaca_used = Double.parseDouble(params.get("VACA_USED") + "");
-//		double vaca_date_num = (vaca_d == null)? 0 : vaca_d.length;
-//		double vaca_half_num = (vaca_h == null)? 0 : 0.5 * vaca_h.length;
-//		double newvaca_used = vaca_used + vaca_date_num + vaca_half_num;
-//		double c = vaca_date_num + vaca_half_num;
-//		
-//		String d = "";
-//		int cot = 0;
-//		
-//		if(vaca_date_num > 0) {
-//			for(int i = 0; i < vaca_d.length; i++) {
-//				String a = vaca_d[i].trim();
-//				
-//				if(cot != 0) {
-//					d += ",";
-//				}
-//				
-//				d += a.substring(0, 4) + ".";
-//				d += a.substring(4, 6) + ".";
-//				d += a.substring(6) + " ";
-//				cot++;
-//			}
-//		}
-//		
-//		if(vaca_half_num > 0) {
-//			for(int i = 0; i < vaca_h.length; i++) {
-//				String b = vaca_h[i].trim();
-//				
-//				if(cot != 0) {
-//					d += ",";
-//				}
-//				
-//				d += b.substring(0, 4) + ".";
-//				d += b.substring(4, 6) + ".";
-//				d += b.substring(6) + " ";
-//				cot++;
-//			}
-//		}
-//		
-//        if(vaca_d == null) {
-//        	vaca_date = "";
-//        }else {
-//        	vaca_date = vaca_date.replace("[","").replace("]", "");
-//        }
-//        
-//        if(vaca_h == null) {
-//        	vaca_half = "";
-//        }else {
-//        	vaca_half = vaca_half.replace("[","").replace("]", "");
-//        }
-//        
-//        completesubj = "-TEST-[휴가 공지]"
-//    				+ member_nm + ""
-//					+ d 
-//					+ "(" + c + "/" + vaca_extra + ")";
-//        
-//        applysubj = "-TEST-[휴가 신청]"
-//        		+ member_nm + ""
-//            	+ d 
-//            	+ "(" + c + "/" + vaca_extra + ")";
-//        
-//        completecontent = "안녕하세요 <br/><br/>"
-//        		+ "포이시스 " + member_nm + member_class_cd + "입니다 <br/>"
-//    		    +vaca_reason+"로 인한 휴가 사용을 알려드립니다 <br/>"
-//    		    +"감사합니다.";
-//       
-//       applycontent = "안녕하세요 <br/><br/>"
-//    		   	+ "포이시스 " + member_nm+member_class_cd + "입니다 <br/>"
-//   		    	+ vaca_reason + "로 인한 휴가 신청합니다 <br/>"
-//   		    	+ "감사합니다."
-//   		    	+ "<a href=\"support.foresys.co.kr/vaca_test.do?MEMBER_NO=" + member_no 
-//   		    	+ "&VACA_CREDATE=" + vaca_credate 
-//   		    	+ "&confirm_chk_member=" + confirm_chk_member 
-//   		    	+ "\">보기</a><br/>";
-//   		 //+"<a href=\"test.co.kr/vaca_test.do?MEMBER_NO="+member_no+"&VACA_CREDATE="+vaca_credate+"&confirm_chk_member="+confirm_chk_member+"\">보기</a><br/>";
-//       String mail_chk = params.get("mail_chk").toString();
-//       if(mail_chk == "complete") {
-//    	   subj = completesubj;
-//    	   content = completecontent;
-//    	   //to_email="solution_all@foresys.co.kr";
-//    	   to_email="ajakorea@foresys.co.kr";
-//       }else if(mail_chk == "apply") {
-//    	   subj = applysubj;
-//    	   content = applycontent;
-//    	   try {
-//    		   CONFIRM_CHK_EMAIL = vacationMapper.getApproverEmail(params);
-//    		   to_email = CONFIRM_CHK_EMAIL;
-//    	   } catch (Exception e) {
-//    		   log.info("이메일주소찾기err "+e);
-//    		   params.put("CONFIRM_CHK", member_no);
-//    		   CONFIRM_CHK_EMAIL = vacationMapper.getApproverEmail(params);
-//    		   to_email = CONFIRM_CHK_EMAIL;
-//    		   subj = "[휴가공지]발송실패";
-//    		   content = "관리자에게 문의하세요.";
-//    	   }
-//
-//       }
-//       
-//       log.info("작성되고 날아갈 제목-------------"+subj+"내용 들어갈자리------------"+content);
-//        
-//        
-//        
-//       try {
-//       Authenticator auth = new SMTPAuthenticator();
-//        Session mailSession = Session.getInstance(p,auth);
-//        MimeMessage message= new MimeMessage(mailSession);
-//
-//        mailSession.setDebug(true);
-//       
-//        
-//        Address fromAddr;
-//		try {
-//			fromAddr = new InternetAddress("foresys00@gmail.com", "포이시스 "+member_nm, "euc-kr");
-//			message.setFrom(fromAddr);
-//		} catch (UnsupportedEncodingException e) {
-//			log.info("---"+e);
-//		}
-//        Address[] toAddrs = {new InternetAddress(to_email)
-//      		  				//,new InternetAddress("solution_all@foresys.co.kr"), 
-//      		  				//,new InternetAddress("porollo@foresys.co.kr")
-//        		};
-//        
-//        
-//        	message.addRecipients(Message.RecipientType.TO, toAddrs);
-//        	message.setSubject(subj,"euc-kr");//제목
-//        	//message.setText(content,"euc-kr");//내용
-//        	message.setContent(content,"text/html;charset=euc-kr"); 	
-//        	Transport.send(message);
-//        	log.info("메일전송");
-//        	param.put("VACA_EMAILCHK", "02");
-//        	getSqlMapClientTemplate().update("vaca.updateEmail",param);
-//        }catch (AddressException e) {
-//        	log.info("addr excep"+e);
-//        	param.put("VACA_EMAILCHK", "03");
-//        	getSqlMapClientTemplate().update("vaca.updateEmail",param);
-//        }catch(MessagingException me) {
-//        	log.info("messagee excep"+me);
-//        	param.put("VACA_EMAILCHK", "03");
-//        	getSqlMapClientTemplate().update("vaca.updateEmail",param);
-//        }
-//	}
+	/**
+	 * 신청, 최종승인, 취소시 메일 보내기
+	 * @param param
+	 */
+	public void sendMail(Map<String, Object> params)  { 
+    	Properties p = new Properties();
+    	p.put("mail.smtp.user", "foresys00@gmail.com");
+		p.put("mail.smtp.host", "smtp.gmail.com");
+		p.put("mail.smtp.port", "465");
+		p.put("mail.smtp.starttls.enable","true");
+		p.put( "mail.smtp.auth", "true");
+		
+		p.put("mail.smtp.debug", "true");
+		p.put("mail.smtp.socketFactory.port", "465"); 
+		p.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory"); 
+		p.put("mail.smtp.socketFactory.fallback", "false");
+        
+        String subj = "";
+        String content = "";
+        String targetEmail = "";
+        
+        String mailKind = params.get("mailKind").toString();
+        
+        // vacaSeq를 통해 해당 휴가정보를 가져옴
+        List<Map<String, Object>> vacaList = vacationMapper.getRequestVacationList(params);
+        
+        String memberId = vacaList.get(0).get("MEMBER_NO") + "";
+        String memberNm = vacaList.get(0).get("MEMBER_NM") + "";
+        
+        String dateString = vacaList.get(0).get("VACA_DATE") + "";
+        
+        if(vacaList.size() > 1) {
+        	dateString += " 외 " + (vacaList.size() -1) + "일";
+        } else {
+        	if("02".equals(vacaList.get(0).get("VACA_DIV"))) {
+            	// 하루인데 오전 반차만 있을 경우..
+            	dateString += " 오전";
+            } else if("03".equals(vacaList.get(0).get("VACA_DIV"))) {
+            	// 하루인데 오후 반차만 있을 경우..
+            	dateString += " 오후";
+            }
+        }
+        
+        String memberClass = vacaList.get(0).get("MEMBER_CLASS_CD_NM") + "";
+        String reason = vacaList.get(0).get("VACA_REASON") + "";
+        String createdDate = vacaList.get(0).get("VACA_CRE_DATE") + "";
+        params.put("id", vacaList.get(0).get("MEMBER_NO"));
+        
+        Date now = new Date();
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy");
+        params.put("year", formatter.format(now));
+        
+        double useCount = 0.0;
+        // 멤버 아이디와 현재 연도로 남은 휴가수 가져오기
+        double remainCount = Double.parseDouble(vacationMapper.getVacationRemains(params).get("VACA_EXTRA_CNT") + "");
+        
+        // 이번에 사용한 휴가 갯수 구하기
+        for(Map<String, Object> vacaItem : vacaList) {
+        	if("01".equals(vacaItem.get("VACA_DIV"))) {
+        		useCount++;
+        	} else {
+        		useCount += 0.5;
+        	}
+        }
+       
+       // mailKind = [02 : 신청], [03 : 휴가 승인되어 완료], [06 : 승인 후 휴가신청 취소] 휴가 상태 코드(C02)를 따름 
+       if("02".equals(mailKind)) {
+    	   subj = "-TEST-[휴가 신청]"
+           		+ memberNm + ""
+               	+ dateString 
+               	+ "(" + useCount + "/" + remainCount + ")";
+       	   content  = "안녕하세요 <br/><br/>"
+          		   		+ "포이시스 " + memberNm + memberClass + "입니다 <br/>"
+         		    	+ reason + "로 인한 휴가 신청합니다 <br/>"
+         		    	+ "감사합니다."
+         		    	+ "<a href=\"support.foresys.co.kr/vacation_s.do?s=" + params.get("vacaSeq") + "&view=y\">휴가 신청서</a><br/>";
+       	   try {
+       		   targetEmail = vacationMapper.getApproverEmail(params);
+//       		   targetEmail="khw200302@foresys.co.kr";
+       	   } catch (Exception e) {
+       		   log.info("이메일주소찾기err "+e);
+       		   params.put("approverId", memberId);
+       		   targetEmail =vacationMapper.getApproverEmail(params);
+       		   subj = "[휴가공지]발송실패";
+       		   content = "관리자에게 문의하세요.";
+       	   }
+       } else if("03".equals(mailKind)) {
+    	   subj  = "-TEST-[휴가 공지]"
+  				+ memberNm + ""
+   				+ dateString 
+   				+ "(" + useCount + "/" + remainCount + ")";
+       	   content = "안녕하세요 <br/><br/>"
+       			   + "포이시스 " + memberNm + memberClass + "입니다 <br/>"
+       			   + reason + "로 인한 휴가 사용을 알려드립니다 <br/>"
+       			   +"감사합니다.";
+//       	   targetEmail="solution_all@foresys.co.kr";
+       	   targetEmail="khw200302@foresys.co.kr";
+       } else if("06".equals(mailKind)) {
+    	   subj = "-TEST-[휴가 취소]"
+        		+ memberNm + ""
+            	+ dateString 
+            	+ "(" + useCount + "/" + remainCount + ")";
+    	   content =  "안녕하세요 <br/><br/>"
+           		+ "포이시스 " + memberNm + memberClass + "입니다 <br/>"
+           		+ dateString 
+       		    + "휴가건 취소를 알려드립니다 <br/>"
+       		    +"감사합니다.";
+//    	   targetEmail="solution_all@foresys.co.kr";
+    	   targetEmail="khw200302@foresys.co.kr";
+       }
+       
+       try {
+    	   Authenticator auth = new SMTPAuthenticator();
+    	   Session mailSession = Session.getInstance(p,auth);
+    	   MimeMessage message= new MimeMessage(mailSession);
+
+    	   mailSession.setDebug(true);
+    	   Address fromAddr;
+    	   
+    	   try {
+    		   fromAddr = new InternetAddress("foresys@foresys.co.kr", "포이시스 "+ memberNm, "euc-kr");
+    		   message.setFrom(fromAddr);
+    	   } catch (UnsupportedEncodingException e) {
+    		   log.error("---"+e);
+    	   }
+    	   
+    	   Address[] toAddrs = {new InternetAddress(targetEmail)
+//      		  				,new InternetAddress("bsha@foresys.co.kr") 
+      		  				//,new InternetAddress("porollo@foresys.co.kr")
+    	   };
+        
+        
+        	message.addRecipients(Message.RecipientType.TO, toAddrs);
+        	message.setSubject(subj,"euc-kr");//제목
+        	message.setContent(content,"text/html;charset=euc-kr"); 	
+        	Transport.send(message);
+        	
+        	log.info("메일전송");
+        	
+        	if("03".equals(mailKind)) {
+        		// 승인되어 휴가 확정의 경우
+        		params.put("vacaEmailSendState", "04");
+        		vacationMapper.updateEmail(params);
+        	}
+        }catch (AddressException e) {
+        	log.info("addr excep"+e);
+        	if("03".equals(mailKind)) {
+        		params.put("vacaEmailSendState", "05");
+        	} else if("02".equals(mailKind)) {
+        		params.put("vacaEmailSendState", "03");
+        	}
+        	vacationMapper.updateEmail(params);
+        }catch(MessagingException me) {
+        	if("03".equals(mailKind)) {
+        		params.put("vacaEmailSendState", "05");
+        	} else if("02".equals(mailKind)) {
+        		params.put("vacaEmailSendState", "03");
+        	}
+        	vacationMapper.updateEmail(params);
+        }
+	}
 	
 }

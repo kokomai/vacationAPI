@@ -52,4 +52,8 @@ public interface VacationMapper {
 	public String getApproverTelNo(Map<String, Object> params);
 	// 승인자의 email을 가져옴
 	public String getApproverEmail(Map<String, Object> params);
+	// 이메일 상태 업데이트
+	public int updateEmail(Map<String, Object> params);
+	// 신청한 해당 휴가 정보들 가져오기
+	public List<Map<String, Object>> getRequestVacationList(Map<String, Object> params);
 }
