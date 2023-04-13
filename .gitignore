@@ -34,3 +34,4 @@ build/
 
 ###propoerties###
 *.yml
+/.svn/

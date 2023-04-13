@@ -56,4 +56,16 @@ public interface VacationMapper {
 	public int updateEmail(Map<String, Object> params);
 	// 신청한 해당 휴가 정보들 가져오기
 	public List<Map<String, Object>> getRequestVacationList(Map<String, Object> params);
+	// 해당 휴가의 승인자 ID들을 가져옴
+	public Map<String, Object> getMyApprovers(Map<String, Object> params);
+	// sms 테이블에 데이터 넣기(Queue 방식)
+	public int smsInsert(Map<String, Object> params);
+	// 자신이 결재자인 경우 휴가 리스트 가져옴
+	public List<Map<String, Object>> getApproveCheckList(Map<String, Object> params);
+	// 유저 이름 가져오기(휴가 승인시 필요)
+	public String getMemberNm(Map<String, Object> params);
+	// 관리를 위한 전체 휴가 목록을 가져옴
+	public List<Map<String, Object>> getVacationManageList(Map<String, Object> params);
+	// 관리를 위한 전체 휴가 목록 중 선택시 디테일 항목을 가져옴
+	public List<Map<String, Object>> getVacationManageDetail(Map<String, Object> params);
 }

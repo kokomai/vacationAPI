@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.foresys.vacationAPI.biz.vacation.mapper.MorningWorkMapper">
+	
+	<select id="getMorningWorkList" resultType="HashMap">
+ SELECT 
+	        DECODE(SUBSTR(SUBSTR(CHECK_DATE,7,8),1,1),0,NULL,SUBSTR(SUBSTR(CHECK_DATE,7,8),1,1))
+	        ||SUBSTR(SUBSTR(CHECK_DATE,7,8),2,2)  as CALENDER_DAY
+	        ,CHECK_DATE
+	        ,MEMBER_NO
+	        ,MEMBER_NM
+	        ,MEMBER_TEL_NO
+	        ,CHECK_MONTH
+	        ,CHECK_YEAR
+	        ,Ceil((To_Number(SubStrB(CHECK_DATE,-2,2)) +7 - 
+             To_Number(To_Char(TO_DATE(CHECK_DATE,'YYYYMMDD'),'D')))/7) as week
+        FROM 
+        	TB_FS_MORNING_WORK_AGT 
+        WHERE                     
+        	CHECK_DATE LIKE CONCAT(#{yearmonth}, '%')  <!-- YYYYMMDD -->
+        ORDER 
+            BY CHECK_DATE								
+   	</select>
+   	
+   	<insert id="insertMorningMember">
+		INSERT INTO TB_FS_MORNING_WORK_AGT (
+			CHECK_DATE <!-- not null -->
+			, MEMBER_NO <!-- not null -->			
+			, MEMBER_NM						
+			, MEMBER_TEL_NO						
+			, CHECK_MONTH
+			, CHECK_YEAR			
+		
+		) VALUES (
+			 #{check_date}
+			, #{member_no}						
+			, #{member_nm}					
+			, #{member_tel_no}			
+			, #{check_month}			
+			, #{check_year}				
+			
+		)
+    </insert>
+    
+    <delete id="deleteMorningMember">
+       DELETE 
+       FROM 
+       		TB_FS_MORNING_WORK_AGT 
+       WHERE
+       		 CHECK_DATE = #{check_date_del}
+             AND MEMBER_NO = #{member_no_del}
+    </delete>
+    
+    <select id="getWorkMemberList" resultType="HashMap">
+ 	   SELECT DISTINCT	        
+	        MEMBER_NO
+	        ,MEMBER_NM
+	        ,MEMBER_TEL_NO	        	        
+        FROM 
+        	TB_FS_MORNING_WORK_AGT 
+        WHERE                     
+        		CHECK_DATE LIKE CONCAT(#{yearmonth}, '%')		        				    								
+   	</select>
+         
+         
+      <select id="morningMemoList" resultType="HashMap">
+       SELECT
+               CHECK_DATE        
+			  ,SUBSTR(CHECK_DATE,0,4) AS YYYY
+			  ,SUBSTR(CHECK_DATE,5,2) AS MM
+			  ,SUBSTR(CHECK_DATE,7,2) AS DD
+			  ,MEMBER_CD
+			  , FN_CODENAME('Z04', W.MEMBER_CD) AS MEMBER_CD_NM         
+			  ,(SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = W.MEMBER_NO) AS MEMBER_NO_NM
+				,(SELECT FN_CODENAME('009', MEMBER_CLASS_CD) FROM TB_FS_AMMEMBER WHERE MEMBER_NO = W.MEMBER_NO) AS MEMBER_NO_CLASS
+				,(SELECT FN_CODENAME('030', MEMBER_POSITION_CD) FROM TB_FS_AMMEMBER WHERE MEMBER_NO = W.MEMBER_NO) AS MEMBER_NO_POSITION
+			  ,MEMBER_NO         
+			  ,START_TIME        
+			  ,END_TIME          
+			  ,PROC_CD           
+			  ,FN_CODENAME('Z03', PROC_CD) AS PROC_CD_NM
+			  ,PROC_MEMO
+			  ,NOTICE_MEMO       
+			  ,PROC_DATE         
+			  ,MEMBER_SIGN_YN    
+			  ,MEMBER_SIGN_DATE  
+			  ,CHECK_YN          
+			  ,ADMIN_SIGN_YN1
+              ,(SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = W.ADMIN_NO1) AS ADMIN_NO1_NM    
+			  ,ADMIN_NO1         
+			  ,ADMIN_SIGN_DATE1  
+			  ,ADMIN_SIGN_YN2    
+			  ,ADMIN_NO2         
+			  ,ADMIN_SIGN_DATE2 
+			  ,(SELECT DECODE(DATE_WEEKDAY,'1','일','2','월','3','화','4','수','5','목','6','금','7','토') FROM TB_FA_DATE_MAST WHERE DATE_STD = #{check_month}) AS DDD
+        FROM
+            TB_FS_MORNING_WORK W
+        WHERE            
+            CHECK_DATE LIKE CONCAT(#{check_month}, '%')              
+    </select>   
+</mapper>

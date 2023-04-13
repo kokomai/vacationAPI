@@ -96,16 +96,16 @@
 	   			L.VACA_SEQ,
 				DL.VACA_DATE,
 				CASE 
-					WHEN L.VACA_APPRV_ID IS NULL THEN NULL 
-					ELSE CONCAT(L.VACA_APPRV_ID, CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID), ')'))
+					WHEN L.VACA_APPRV_REQ_ID IS NULL THEN NULL 
+					ELSE CONCAT((SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = VACA_APPRV_REQ_ID), CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID), ')'))
 				END AS APPRV1,
 				CASE 
-					WHEN L.VACA_APPRV_ID2 IS NULL THEN NULL 
-					ELSE CONCAT(L.VACA_APPRV_ID2, CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID2), ')'))
+					WHEN L.VACA_APPRV_REQ_ID2 IS NULL THEN NULL 
+					ELSE CONCAT((SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = VACA_APPRV_REQ_ID2), CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID2), ')'))
 				END AS APPRV2,
 				CASE 
-					WHEN L.VACA_APPRV_ID3 IS NULL THEN NULL 
-					ELSE CONCAT(L.VACA_APPRV_ID3, CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID3), ')'))
+					WHEN L.VACA_APPRV_REQ_ID3 IS NULL THEN NULL 
+					ELSE CONCAT((SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = VACA_APPRV_REQ_ID3), CONCAT(CONCAT('(', L.VACA_APPRV_REQ_ID3), ')'))
 				END AS APPRV3,
 				FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
 				FN_CODENAME ('C03', L.VACA_EMAIL_SEND_STATE) AS VACA_EMAIL_SEND_STATE,
@@ -153,7 +153,7 @@
 				L.VACA_SEQ,
 				CONCAT(AM.MEMBER_NM, CONCAT(CONCAT('(', AM.MEMBER_NO), ')')) AS REQUESTER,
 				AM.MEMBER_NO AS REQUESTER_ID,
-				DL.VACA_DATE,
+				REGEXP_REPLACE(DL.VACA_DATE, '(.{4})(.{2})(.{2})', '\1년\2월\3일') AS VACA_DATE, 
 				FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
 				FN_CODENAME ('C04', DL.VACA_DIV) AS VACA_DIV,
 				INSU.VACA_INSU,
@@ -205,6 +205,7 @@
 					CASE 
 						WHEN VACA_APPRV_REQ_ID2 IS NULL AND VACA_STATE = '02' THEN 1
 						WHEN VACA_APPRV_REQ_ID2 IS NOT NULL AND VACA_STATE = '53' THEN 1
+						WHEN VACA_APPRV_REQ_ID2 IS NOT NULL AND VACA_STATE = '63' THEN 1
 						ELSE 0 
 					END = 1
 				</when>
@@ -221,22 +222,13 @@
 			VACA_SEQ
 			,MEMBER_NO
 			,VACA_REASON
-			<if test="vacaApprvId != null">
-			,VACA_APPRV_ID
-			</if>
-			<if test="vacaApprvReqId != null">
+			<if test="vacaApprvReqId != null and !''.equals(vacaApprvReqId)">
 			,VACA_APPRV_REQ_ID
 			</if>
-			<if test="vacaApprvId2 != null">
-			,VACA_APPRV_ID2
-			</if>
-			<if test="vacaApprvReqId2 != null">
+			<if test="vacaApprvReqId2 != null and !''.equals(vacaApprvReqId2)">
 			,VACA_APPRV_REQ_ID2
 			</if>
-			<if test="vacaApprvId3 != null">
-			,VACA_APPRV_ID3
-			</if>
-			<if test="vacaApprvReqId3 != null">
+			<if test="vacaApprvReqId3 != null and !''.equals(vacaApprvReqId3)">
 			,VACA_APPRV_REQ_ID3
 			</if>
 			,VACA_CHG_DT
@@ -246,22 +238,13 @@
 			#{vacaSeq}
 			, #{id}
 			, #{reason}
-			<if test="vacaApprvId != null">
-			, #{vacaApprvId}
-			</if>
-			<if test="vacaApprvReqId != null">
+			<if test="vacaApprvReqId != null and !''.equals(vacaApprvReqId)">
 			, #{vacaApprvReqId}
 			</if>
-			<if test="vacaApprvId2 != null">
-			, #{vacaApprvId2}
-			</if>
-			<if test="vacaApprvReqId2 != null">
+			<if test="vacaApprvReqId2 != null and !''.equals(vacaApprvReqId2)">
 			, #{vacaApprvReqId2}
 			</if>
-			<if test="vacaApprvId3 != null">
-			, #{vacaApprvId3}
-			</if>
-			<if test="vacaApprvReqId3 != null">
+			<if test="vacaApprvReqId3 != null and !''.equals(vacaApprvReqId3)">
 			, #{vacaApprvReqId3}
 			</if>
 			, TO_CHAR(sysdate, 'YYYYMMDD')
@@ -320,7 +303,23 @@
 	<update id="updateVacaUsedCount">
 		UPDATE TB_FS_VACA_MAST
 		SET 
-			VACA_USED_CNT=#{usedCount},
+			VACA_USED_CNT= (
+				SELECT 
+					NVL(SUM(CASE WHEN VACA_DIV = '01' THEN 1 ELSE 0.5 END ), 0)	AS COUNT
+				FROM 
+					TB_FS_VACA_DATE_LIST
+				WHERE 
+					VACA_SEQ in (
+						SELECT 
+							vaca_seq FROM TB_FS_VACA_LIST
+						WHERE 
+							MEMBER_NO  = #{requesterId}
+						AND 
+							VACA_CRE_DATE LIKE CONCAT(TO_CHAR(SYSDATE, 'YYYY'), '%')
+						AND 
+							VACA_STATE IN ('73', '63', '53', '03', '02', '04') -- 07승인,06승인,05승인,승인,신청,부결 상태
+					)
+			),
 			VACA_CHG_ID=#{chngId},
 			VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
 		WHERE
@@ -346,6 +345,8 @@
 			WHEN AUTH2 IS NULL AND AUTH1 = #{id} THEN '03'
 			-- 1차승인자가 없고, 3차승인자가 등록되어 있으며, USER가 2차 승인자인 경우 -> 1차 승인
 			WHEN AUTH1 IS NULL AND AUTH3 IS NOT NULL AND AUTH2 = #{id} THEN '53'
+			-- 1차, 3차승인자가 있고, USER가 2차승인자인 경우 -> 2차 승인
+			WHEN AUTH1 IS NOT NULL AND AUTH3 IS NOT NULL AND AUTH2 = #{id} THEN '63'
 			-- 1차승인자가 있고, USER가 2차승인자인 경우 -> 승인
 			WHEN AUTH1 IS NOT NULL AND AUTH2 = #{id} THEN '03'
 			-- 1차,3차승인자가 없고, USER가 2차승인자인 경우 -> 승인
@@ -377,6 +378,15 @@
 		UPDATE TB_FS_VACA_LIST
 		SET 
 			VACA_STATE=#{state},
+			<if test="VACA_APPRV_ID != null and !''.equals(VACA_APPRV_ID)">
+				VACA_APPRV_ID = #{VACA_APPRV_ID},
+			</if>
+			<if test="VACA_APPRV_ID2 != null and !''.equals(VACA_APPRV_ID2)">
+				VACA_APPRV_ID2 = #{VACA_APPRV_ID2},
+			</if>
+			<if test="VACA_APPRV_ID3 != null and !''.equals(VACA_APPRV_ID3)">
+				VACA_APPRV_ID3 = #{VACA_APPRV_ID3},
+			</if>
 			VACA_CHG_DT=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
 		WHERE
 			VACA_SEQ=#{vacaSeq}
@@ -413,14 +423,16 @@
 	</update>
 	<select id="getRequestVacationList" resultType="HashMap">
 		SELECT 
-			DL.VACA_DATE,
+			to_char(TO_DATE(DL.VACA_DATE, 'yyyymmdd'), 'yyyy.mm.dd') AS VACA_DATE,
 			L.VACA_SEQ,
 			DL.VACA_DIV,
+			FN_CODENAME ('C04', DL.VACA_DIV) AS VACA_DIV_NM,
 			M.MEMBER_NO,
 			M.MEMBER_NM,
 			L.VACA_REASON,
 			FN_CODENAME('009',M.MEMBER_CLASS_CD) AS MEMBER_CLASS_CD_NM,
-			L.VACA_CRE_DATE 
+			L.VACA_CRE_DATE,
+			M.MEMBER_POSITION_CD
 		FROM 
 			TB_FS_VACA_LIST L,
 			TB_FS_VACA_DATE_LIST DL,
@@ -428,31 +440,182 @@
 		WHERE 
 			L.VACA_SEQ = DL.VACA_SEQ
 		AND
-			L.MEMBER_NO  = M.MEMBER_NO 
-		AND 
+			L.MEMBER_NO  = M.MEMBER_NO
+		AND 	
 			L.VACA_SEQ = #{vacaSeq}
 		ORDER BY VACA_DATE ASC
    	</select>
-   	<select id="getApproverId" resultType="HashMap">
-		SELECT 
+   	<select id="getMyApprovers" resultType="HashMap">
+   		SELECT 
+			VACA_APPRV_REQ_ID, 
+			VACA_APPRV_REQ_ID2, 
+			VACA_APPRV_REQ_ID3 
+   		FROM 
+   			TB_FS_VACA_LIST
+		WHERE
+			VACA_SEQ=#{vacaSeq}
+   	</select>
+   	
+   	<!-- 탑 팝업 sms 등록 -->
+    <insert id="smsInsert">
+        INSERT INTO SMSDATA ( 
+            SEQNO
+            , INDATE
+            , INTIME
+            , RPHONE1
+            , RPHONE2
+            , RPHONE3
+            , SENDID
+            , SENDNAME
+            , SPHONE1
+            , SPHONE2
+            , SPHONE3
+            , MSG
+            , RDATE
+            , RTIME
+            , SEND_MEMBER
+            , DEPTID
+        ) VALUES (
+            SQ_SMSDATA_SEQ.NEXTVAL
+            , TO_CHAR(sysdate, 'YYYYMMDD') 
+            , TO_CHAR(sysdate, 'HH24MISS') 
+            , #{rphone1}
+            , #{rphone2}
+            , #{rphone3}
+            , 'foresys'
+            , '포이시스'
+            , #{sphone1}
+            , #{sphone2}
+            , #{sphone3}
+            , #{msg}
+            , #{rdate}
+            , #{rtime}
+            , #{send_member}
+            , 'FI-3QP-59'
+        )
+    </insert>
+    
+    <!-- 승인한 휴가 리스트 (결재자 자신) -->
+    <select id="getApproveCheckList" resultType="HashMap">
+	    SELECT 
+				VACA_SEQ,
+				MAX(REQUESTER) AS REQUESTER,
+				MAX(REQUESTER_ID) AS REQUESTER_ID,
+				LISTAGG(VACA_DATE ||'(' || VACA_DIV || ')', '/') WITHIN GROUP (ORDER BY VACA_DATE) AS VACA_DATES,
+				MAX(VACA_REASON) AS REASON,
+				MAX(VACA_INSU) AS VACA_INSU,
+				MAX(VACA_INSU_UPMU) AS VACA_INSU_UPMU,
+				MAX(VACA_STATE) AS VACA_STATE,
+				MAX(REQUEST_DATE) AS REQUEST_DATE,
+				VACA_APPRV_REQ_ID,
+				VACA_APPRV_REQ_ID2,
+				VACA_APPRV_REQ_ID3
+		FROM
+		    (
+		    	SELECT DISTINCT
+						L.VACA_SEQ,
+						CONCAT(AM.MEMBER_NM, CONCAT(CONCAT('(', AM.MEMBER_NO), ')')) AS REQUESTER,
+						AM.MEMBER_NO AS REQUESTER_ID,
+						REGEXP_REPLACE(DL.VACA_DATE, '(.{4})(.{2})(.{2})', '\1년\2월\3일') AS VACA_DATE,
+						FN_CODENAME ('C02', L.VACA_STATE) AS VACA_STATE,
+						FN_CODENAME ('C04', DL.VACA_DIV) AS VACA_DIV,
+						INSU.VACA_INSU,
+						INSU.VACA_INSU_UPMU,
+						L.VACA_REASON,
+						L.VACA_CRE_DATE AS REQUEST_DATE,
+					    L.VACA_APPRV_REQ_ID AS VACA_APPRV_REQ_ID,
+						L.VACA_APPRV_REQ_ID2 AS VACA_APPRV_REQ_ID2,
+						L.VACA_APPRV_REQ_ID3 AS VACA_APPRV_REQ_ID3
+					FROM 
+						TB_FS_VACA_LIST L,
+						TB_FS_VACA_DATE_LIST DL,
+						TB_FS_VACA_INSU_LIST INSU,
+						TB_FS_AMMEMBER AM,
+						TB_FS_VACA_MAST MAST
+					WHERE
+						L.VACA_SEQ = DL.VACA_SEQ
+					AND
+						L.VACA_SEQ = INSU.VACA_SEQ
+					AND
+						L.MEMBER_NO = AM.MEMBER_NO
+					AND
+						L.MEMBER_NO = MAST.MEMBER_NO
+					AND 
+						(L.VACA_APPRV_REQ_ID = #{id}
+						OR L.VACA_APPRV_REQ_ID2 = #{id} 
+						OR L.VACA_APPRV_REQ_ID3 = #{id})
+			) A
+		GROUP BY VACA_SEQ, VACA_APPRV_REQ_ID, VACA_APPRV_REQ_ID2, VACA_APPRV_REQ_ID3
+		ORDER BY REQUEST_DATE DESC
+    </select>
+    <select id="getMemberNm" resultType="String">
+    	SELECT 
+    		MEMBER_NM
+   		FROM
+    		TB_FS_AMMEMBER
+    	WHERE 
+    		MEMBER_NO = #{id}
+    </select>
+   	<select id="getVacationManageList" resultType="HashMap">
+		SELECT
 			DL.VACA_DATE,
-			L.VACA_SEQ,
-			DL.VACA_DIV,
-			M.MEMBER_NO,
-			M.MEMBER_NM,
-			L.VACA_REASON,
-			FN_CODENAME('009',M.MEMBER_CLASS_CD) AS MEMBER_CLASS_CD_NM,
-			L.VACA_CRE_DATE 
+			(CASE WHEN M.MEMBER_POSITION_CD = '002' THEN '002' ELSE '001' END) AS MEMBER_POSITION_CD,
+			COUNT(L.VACA_SEQ) AS VACA_COUNT
 		FROM 
 			TB_FS_VACA_LIST L,
 			TB_FS_VACA_DATE_LIST DL,
 			TB_FS_AMMEMBER M
 		WHERE 
-			L.VACA_SEQ = DL.VACA_SEQ
+			L.VACA_SEQ = DL.VACA_SEQ 
 		AND
-			L.MEMBER_NO  = M.MEMBER_NO 
+			DL.VACA_DATE  LIKE CONCAT(#{yearmonth}, '%')
 		AND 
-			L.VACA_SEQ = #{vacaSeq}
-		ORDER BY VACA_DATE ASC
+			L.MEMBER_NO = M.MEMBER_NO 
+		AND 
+			L.VACA_STATE IN ('03', '73')
+		<if test="'C06'.equals(auth)">
+			AND
+				M.MEMBER_POSITION_CD = #{department}
+		</if>
+		GROUP BY 
+			DL.VACA_DATE, (CASE WHEN M.MEMBER_POSITION_CD = '002' THEN '002' ELSE '001' END)
+		ORDER BY DL.VACA_DATE DESC
+   	</select>
+   	<select id="getVacationManageDetail" resultType="HashMap">
+		SELECT
+			DL.VACA_DATE,
+			CONCAT(CONCAT(M.MEMBER_NM, ' '), FN_CODENAME('009',M.MEMBER_CLASS_CD)) AS MEMBER_NM,
+			M.MEMBER_POSITION_CD,
+			FN_CODENAME('008', M.MEMBER_POSITION_CD) AS MEMBER_POSTION_CD_NM,
+			NVL(MAST.VACA_TOT_CNT-NVL(VACA_USED_CNT,0), 0) AS VACA_EXTRA_CNT
+		FROM 
+			TB_FS_VACA_LIST L,
+			TB_FS_VACA_DATE_LIST DL,
+			TB_FS_AMMEMBER M,
+			TB_FS_VACA_MAST MAST
+		WHERE 
+			L.VACA_SEQ = DL.VACA_SEQ 
+		AND 
+			L.MEMBER_NO = M.MEMBER_NO 
+		AND
+			L.MEMBER_NO = MAST.MEMBER_NO
+		AND 
+			L.VACA_STATE IN ('03', '73')
+		AND 
+			MAST.VACA_YEAR = TO_CHAR(SYSDATE, 'YYYY') 
+		AND
+			DL.VACA_DATE = #{date}
+		<if test="'C06'.equals(auth)">
+			AND
+				M.MEMBER_POSITION_CD = #{department}
+		</if>
+		<choose>
+			<when test="'002'.equals(department)">
+				ORDER BY CASE WHEN M.MEMBER_POSITION_CD = '002' THEN 0 ELSE 1 END
+			</when>
+			<otherwise>
+				ORDER BY CASE WHEN M.MEMBER_POSITION_CD = '002' THEN 1 ELSE 0 END
+			</otherwise>
+		</choose>
    	</select>
 </mapper>

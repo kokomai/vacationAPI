@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration scan="true" scanPeriod="30 seconds">
+
+	<property name="LOGS_PATH" value="/data/logs/vacationApi" />
+
+	 <appender name="log_file" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS_PATH}/vaca.log</file>
+
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %X{req.requestURI} %X{req.queryString} %-5level %logger[%method:%line] - %msg%n</pattern>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS_PATH}/vaca_%d{yyyyMMdd}.log</fileNamePattern>
+            <maxHistory>60</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <logger name="com.foresys" level="DEBUG">
+        <appender-ref ref="log_file"/>
+    </logger>
+
+    <!-- 전체 설정 -->
+	<appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			<pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+		</layout>
+	</appender>
+
+    <root level="DEBUG" >
+        <appender-ref ref="console" />
+    </root>
+
+    <logger name="com.foresys" level="DEBUG" additivity="false">
+        <appender-ref ref="console" />
+    </logger>
+
+ 	<logger name="jdbc.sqlonly" level="DEBUG" />
+	<logger name="jdbc.sqltiming" level="DEBUG" />
+	<logger name="jdbc.audit" level="ERROR" />
+	<logger name="jdbc.resultset" level="DEBUG" />
+	<logger name="jdbc.resultsettable" level="ERROR" />
+	<logger name="jdbc.connection" level="ERROR" />
+
+</configuration>

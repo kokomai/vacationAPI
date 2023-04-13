@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.foresys.vacationAPI.system.error.mapper.ErrorReportMapper">
+   	<insert id="insertError">
+		INSERT INTO SUPPORT.TB_FS_VACA_ERROR( 
+			SEQ
+			,LOCATION
+			,ERROR_TEXT
+		)
+		VALUES( 
+			SUPPORT.ERROR_SEQ.NEXTVAL
+			, #{location}
+			, #{errorText}
+		)
+	</insert>
+</mapper>

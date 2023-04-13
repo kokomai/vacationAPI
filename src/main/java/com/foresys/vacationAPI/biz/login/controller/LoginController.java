@@ -20,8 +20,13 @@ public class LoginController {
 	LoginService loginService;
 	
 	
-	@PostMapping("/login/loginCheck")
+	@PostMapping("/vacation/login/loginCheck")
 	public Map<String, Object>  loginCheck(@RequestBody Map<String, Object> params, HttpServletRequest request, HttpServletResponse response, Authentication authentication)throws Exception{
 		return loginService.loginCheck(params, request, response, authentication);
+	}
+	
+	@PostMapping("/vacation/login/loginForSms")
+	public Map<String, Object>  loginForSms(@RequestBody Map<String, Object> params, HttpServletRequest request, HttpServletResponse response, Authentication authentication)throws Exception{
+		return loginService.loginForSms(params, request, response, authentication);
 	}
 }

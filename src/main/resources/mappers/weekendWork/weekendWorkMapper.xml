@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+<mapper namespace="com.foresys.vacationAPI.biz.weekendWork.mapper.WeekendWorkMapper">
+
+
+<!-- ================= SELECT =================  -->
+
+ <!-- 주말근무 결재자 목록 조회 -->
+ <select id="getApprovers" resultType="HashMap">
+		SELECT
+			AM.MEMBER_NM AS NM,
+		    ZC.CODE AS ID,
+		    CASE 
+		    	WHEN (ZC.CODEGRP = 'C05') THEN '01'
+		    	WHEN (ZC.CODEGRP = 'C06') THEN '02'    	
+		    ELSE '03'
+		    END AS AUTH
+		FROM 
+		    TB_FS_ZCCODE ZC, 
+		    TB_FS_AMMEMBER AM
+		WHERE
+			ZC.CODE = AM.MEMBER_NO
+		AND 
+		    CODEGRP in ('C05', 'C06', 'C07')
+		AND
+			CODE_VAL1='Y'
+		AND
+			CODE_VAL2='Y'
+		AND 
+			MEMBER_WORK_CD != '003'
+		AND 
+			MEMBER_POSITION_CD = #{department}
+   	</select>
+   	
+   	
+  	<select id="getApplySeq" resultType="String">
+   		SELECT TO_CHAR(sysdate,'YYYY') || LPAD(NVL(SUBSTR(MAX(APPLY_SEQ),5), 0),4,'0')+1 
+   		FROM TB_FS_WEEKEND_WK_LIST
+   	</select>
+   	
+   	<select id="getWeekendWorkList" resultType="HashMap">
+	   	SELECT 
+	   		L.APPLY_SEQ,
+ 			WL.APPLY_DATE,
+			L.MEMBER_NO,
+			FN_CODENAME ('C02', L.STATE) AS STATE
+		FROM 
+			TB_FS_WEEKEND_WK_LIST L,
+			TB_FS_WEEKEND_WK_APPLY_LIST WL
+		WHERE 
+			L.APPLY_SEQ = WL.APPLY_SEQ
+		AND
+			WL.APPLY_DATE LIKE CONCAT(#{yearmonth}, '%')
+		AND 
+			L.MEMBER_NO = #{id}
+   	</select>
+   	
+   	
+  	<select id="getWeekendWorkInfo" resultType="HashMap">
+	   	SELECT *
+		FROM(
+	   		SELECT 
+	   			L.APPLY_SEQ,
+				WL.APPLY_DATE,
+				CASE 
+					WHEN L.APPRV_REQ_ID IS NULL THEN NULL 
+					ELSE CONCAT((SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = APPRV_REQ_ID), CONCAT(CONCAT('(', L.APPRV_REQ_ID), ')'))
+				END AS APPRV1,
+				CASE 
+					WHEN L.APPRV_REQ_ID2 IS NULL THEN NULL 
+					ELSE CONCAT((SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = APPRV_REQ_ID2), CONCAT(CONCAT('(', L.APPRV_REQ_ID2), ')'))
+				END AS APPRV2,
+				CASE 
+					WHEN L.APPRV_REQ_ID3 IS NULL THEN NULL 
+					ELSE CONCAT((SELECT MEMBER_NM FROM TB_FS_AMMEMBER WHERE MEMBER_NO = APPRV_REQ_ID3), CONCAT(CONCAT('(', L.APPRV_REQ_ID3), ')'))
+				END AS APPRV3,
+				FN_CODENAME ('C02', L.STATE) AS STATE,
+				L.REASON,
+				L.REG_DATE,
+				L.REJECT_REASON,
+				ROW_NUMBER() OVER (PARTITION BY L.APPLY_SEQ ORDER BY L.REG_DATE DESC) AS RN 
+			FROM 
+				TB_FS_WEEKEND_WK_LIST L,
+				TB_FS_WEEKEND_WK_APPLY_LIST WL
+				
+			WHERE 
+				L.APPLY_SEQ = WL.APPLY_SEQ 
+			AND
+				L.APPLY_SEQ = #{seq}
+			AND 
+				WL.APPLY_DATE = #{date}
+			AND 
+				L.MEMBER_NO = #{id}
+		) T
+		WHERE T.RN = 1
+   	</select>
+   	
+   	<select id="getApproveList" resultType="HashMap">
+	   	SELECT 
+	            APPLY_SEQ,
+				MAX(REQUESTER) AS REQUESTER,
+				MAX(REQUESTER_ID) AS REQUESTER_ID,
+				LISTAGG(APPLY_DATE, '/') WITHIN GROUP (ORDER BY APPLY_DATE) AS APPLY_DATES,
+				MAX(REASON) AS REASON,
+				MAX(STATE) AS STATE,
+				MAX(REQUEST_DATE) AS REQUEST_DATE
+			FROM
+			(
+				SELECT 
+					L.APPLY_SEQ,
+					CONCAT(AM.MEMBER_NM, CONCAT(CONCAT('(', AM.MEMBER_NO), ')')) AS REQUESTER,
+					AM.MEMBER_NO AS REQUESTER_ID,
+					REGEXP_REPLACE(AL.APPLY_DATE, '(.{4})(.{2})(.{2})', '\1년\2월\3일') AS APPLY_DATE, 
+					FN_CODENAME ('C02', L.STATE) AS STATE,
+					L.REASON,
+					L.REG_DATE AS REQUEST_DATE
+				FROM 
+					TB_FS_WEEKEND_WK_LIST L,
+					TB_FS_WEEKEND_WK_APPLY_LIST AL,
+					TB_FS_AMMEMBER AM
+				WHERE
+					L.APPLY_SEQ = AL.APPLY_SEQ
+				AND
+					L.MEMBER_NO = AM.MEMBER_NO
+				AND 
+					(L.APPRV_REQ_ID = #{id}
+					OR L.APPRV_REQ_ID2 = #{id} 
+					OR L.APPRV_REQ_ID3 = #{id})
+				<choose>
+					<when test="'C05'.equals(auth)">
+					AND
+						STATE = '02'
+					</when>
+					<when test="'C06'.equals(auth)">
+					AND
+						CASE 
+							WHEN APPRV_REQ_ID IS NULL AND STATE = '02' THEN 1
+							WHEN APPRV_REQ_ID IS NOT NULL AND STATE = '53' THEN 1
+							ELSE 0 
+						END = 1
+					</when>
+					<when test="'C07'.equals(auth)">
+					AND
+						CASE 
+							WHEN APPRV_REQ_ID2 IS NULL AND STATE = '02' THEN 1
+							WHEN APPRV_REQ_ID2 IS NOT NULL AND STATE = '53' THEN 1
+							WHEN APPRV_REQ_ID2 IS NOT NULL AND STATE = '63' THEN 1
+							ELSE 0 
+						END = 1
+					</when>
+				</choose>
+			) A
+			GROUP BY A.APPLY_SEQ
+   	</select>
+   	
+   	
+   	<select id="getApprovalState" resultType="String">
+	   		SELECT 
+				CASE 
+				-- 2차승인자가 있고, USER가 1차 승인자인 경우 -> 1차 승인
+				WHEN AUTH2 IS NOT NULL AND AUTH1 = #{id} THEN '53'
+				-- 2차승인자가 없고, USER가 1차 승인자인 경우 -> 승인
+				WHEN AUTH2 IS NULL AND AUTH1 = #{id} THEN '03'
+				-- 1차승인자가 없고, 3차승인자가 등록되어 있으며, USER가 2차 승인자인 경우 -> 1차 승인
+				WHEN AUTH1 IS NULL AND AUTH3 IS NOT NULL AND AUTH2 = #{id} THEN '53'
+				-- 1차, 3차승인자가 있고, USER가 2차승인자인 경우 -> 2차 승인
+				WHEN AUTH1 IS NOT NULL AND AUTH3 IS NOT NULL AND AUTH2 = #{id} THEN '63'
+				-- 1차승인자가 있고, USER가 2차승인자인 경우 -> 승인
+				WHEN AUTH1 IS NOT NULL AND AUTH2 = #{id} THEN '03'
+				-- 1차,3차승인자가 없고, USER가 2차승인자인 경우 -> 승인
+				WHEN AUTH1 IS NULL AND AUTH3 IS NULL AND AUTH2 = #{id} THEN '03'
+				-- USER가 3차 승인자인 경우 -> 승인
+				WHEN AUTH3 = #{id} THEN '03'
+				END AS STATE
+			FROM (
+				SELECT
+					APPRV_REQ_ID AS AUTH1,
+					APPRV_REQ_ID2 AS AUTH2,
+					APPRV_REQ_ID3 AS AUTH3
+				FROM TB_FS_WEEKEND_WK_LIST
+				WHERE APPLY_SEQ = #{applySeq}
+				)
+   	</select>
+   	
+   	<select id="getMemberNm" resultType="String">
+    	SELECT 
+    		MEMBER_NM
+   		FROM
+    		TB_FS_AMMEMBER
+    	WHERE 
+    		MEMBER_NO = #{id}
+    </select>
+    
+    <select id="getApproveCheckList" resultType="HashMap">
+		SELECT 
+				APPLY_SEQ,
+				MAX(REQUESTER) AS REQUESTER,
+				MAX(REQUESTER_ID) AS REQUESTER_ID,
+				LISTAGG(APPLY_DATE , '/') WITHIN GROUP (ORDER BY APPLY_DATE) AS APPLY_DATES,
+				MAX(REASON) AS REASON,
+				MAX(STATE) AS STATE,
+				MAX(REQUEST_DATE) AS REQUEST_DATE,
+                APPRV_REQ_ID,
+				APPRV_REQ_ID2,
+				APPRV_REQ_ID3
+		FROM
+		    (
+		    	SELECT 
+						L.APPLY_SEQ,
+						CONCAT(AM.MEMBER_NM, CONCAT(CONCAT('(', AM.MEMBER_NO), ')')) AS REQUESTER,
+						AM.MEMBER_NO AS REQUESTER_ID,
+						REGEXP_REPLACE(AL.APPLY_DATE, '(.{4})(.{2})(.{2})', '\1년\2월\3일') AS APPLY_DATE,
+						FN_CODENAME ('C02', L.STATE) AS STATE,
+						L.REASON,
+						L.REG_DATE AS REQUEST_DATE,
+					    L.APPRV_REQ_ID AS APPRV_REQ_ID,
+						L.APPRV_REQ_ID2 AS APPRV_REQ_ID2,
+						L.APPRV_REQ_ID3 AS APPRV_REQ_ID3
+					FROM 
+						TB_FS_WEEKEND_WK_LIST L,
+						TB_FS_WEEKEND_WK_APPLY_LIST AL,
+						TB_FS_AMMEMBER AM
+					WHERE
+						L.APPLY_SEQ = AL.APPLY_SEQ
+					AND
+						L.MEMBER_NO = AM.MEMBER_NO
+   					AND L.STATE IN ('03','04','73') <!-- 03: 승인, 04: 3차승인, 73: 반려 -->
+					AND 
+						(L.APPRV_REQ_ID = #{id}
+						OR L.APPRV_REQ_ID2 =  #{id} 
+						OR L.APPRV_REQ_ID3 =  #{id}
+                        )
+			) A
+		GROUP BY APPLY_SEQ, APPRV_REQ_ID, APPRV_REQ_ID2, APPRV_REQ_ID3    
+    </select>
+    
+     <select id="getWeekendWorkManageList" resultType="HashMap">
+		SELECT
+			AL.APPLY_DATE,
+			(CASE WHEN M.MEMBER_POSITION_CD = '002' THEN '002' ELSE '001' END) AS MEMBER_POSITION_CD,
+			COUNT(L.APPLY_SEQ) AS APPLY_COUNT
+		FROM 
+			TB_FS_WEEKEND_WK_LIST L,
+			TB_FS_WEEKEND_WK_APPLY_LIST AL,
+			TB_FS_AMMEMBER M
+		WHERE 
+			L.APPLY_SEQ = AL.APPLY_SEQ 
+		AND
+			AL.APPLY_DATE  LIKE CONCAT(#{yearmonth}, '%')
+		AND 
+			L.MEMBER_NO = M.MEMBER_NO 
+		AND 
+			L.STATE IN ('03', '73')
+		<if test="'C06'.equals(auth)">
+			AND
+				M.MEMBER_POSITION_CD = #{department}
+		</if>
+		GROUP BY 
+			AL.APPLY_DATE, (CASE WHEN M.MEMBER_POSITION_CD = '002' THEN '002' ELSE '001' END)
+		ORDER BY AL.APPLY_DATE DESC
+   	</select>
+   	
+   	<select id="getWeekendWorkManageDetail" resultType="HashMap">
+		SELECT
+			AL.APPLY_DATE,
+			CONCAT(CONCAT(M.MEMBER_NM, ' '), FN_CODENAME('009',M.MEMBER_CLASS_CD)) AS MEMBER_NM,
+			M.MEMBER_POSITION_CD,
+			FN_CODENAME('008', M.MEMBER_POSITION_CD) AS MEMBER_POSTION_CD_NM
+		FROM 
+			TB_FS_WEEKEND_WK_LIST L,
+			TB_FS_WEEKEND_WK_APPLY_LIST AL,
+			TB_FS_AMMEMBER M
+		WHERE 
+			L.APPLY_SEQ = AL.APPLY_SEQ 
+		AND 
+			L.MEMBER_NO = M.MEMBER_NO 
+		AND 
+			L.STATE IN ('03', '73')
+		AND
+			AL.APPLY_DATE = #{date}
+		<if test="'C06'.equals(auth)">
+			AND
+				M.MEMBER_POSITION_CD = #{department}
+		</if>
+   	</select>
+   	
+   	<!-- ================= SELECT END =================  -->
+   	
+   	<!-- ================= INSERT =================  -->
+   	
+	<!-- 주말근무 신청정보 등록  -->
+  	<insert id="insertWeekendWorkList">
+		INSERT INTO TB_FS_WEEKEND_WK_LIST(
+			APPLY_SEQ 
+			,MEMBER_NO
+			,REASON
+			,STATE
+			<if test="apprvId != null and !''.equals(apprvId)">
+			,APPRV_ID
+			</if>
+			<if test="apprvId2 != null and !''.equals(apprvId2)">
+			,APPRV_ID2
+			</if>
+			<if test="apprvId3 != null and !''.equals(apprvId3)">
+			,APPRV_ID3
+			</if>
+			<if test="apprvReqId != null and !''.equals(apprvReqId)">
+			,APPRV_REQ_ID
+			</if>
+			<if test="apprvReqId2 != null and !''.equals(apprvReqId2)">
+			,APPRV_REQ_ID2
+			</if>
+			<if test="apprvReqId3 != null and !''.equals(apprvReqId3)">
+			,APPRV_REQ_ID3
+			</if>
+			,REG_DATE
+		)
+		VALUES( 
+			#{applySeq}
+			, #{id}
+			, #{reason}
+			, '02' <!-- 02: 신청 -->
+			<if test="apprvId != null and !''.equals(apprvId)">
+			, #{apprvId}
+			</if>
+			<if test="apprvId2 != null and !''.equals(apprvId2)">
+			, #{apprvId2}
+			</if>
+			<if test="apprvId3 != null and !''.equals(apprvId3)">
+			, #{apprvId3}
+			</if>
+			<if test="apprvReqId != null and !''.equals(apprvReqId)">
+			, #{apprvReqId}
+			</if>
+			<if test="apprvReqId2 != null and !''.equals(apprvReqId2)">
+			, #{apprvReqId2}
+			</if>
+			<if test="apprvReqId3 != null and !''.equals(apprvReqId3)">
+			, #{apprvReqId3}
+			</if>
+			, TO_CHAR(sysdate, 'YYYYMMDD')
+		)
+	</insert>
+	
+	<!-- 주말근무 신청일 등록 -->
+	<insert id="insertWeekendWorkApplyList">
+   		INSERT INTO TB_FS_WEEKEND_WK_APPLY_LIST(
+			APPLY_SEQ
+			,APPLY_DATE
+		)
+		VALUES(
+			#{applySeq}
+			,#{VACA_DATE}
+		)
+   	</insert>
+   	
+	
+	<!-- ================= INSERT END =================  -->
+
+
+	<!-- ================= UPDATE =================  -->
+	<!-- 주말근무는 C06 권한만 수락 -->
+	<update id="approveWeekendWork">
+		UPDATE TB_FS_WEEKEND_WK_LIST
+		SET 
+			STATE=#{state},
+            APPRV_ID2 = #{nowApproverNm},
+            APPRV_REQ_ID2=#{id},
+			CHG_DATE=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
+		WHERE
+			APPLY_SEQ= #{applySeq}
+	</update>
+	
+	<update id="rejectWeekendwork">
+		UPDATE TB_FS_WEEKEND_WK_LIST
+		SET 
+			STATE='04',
+			REJECT_REASON=#{reason},
+			CHG_DATE=TO_CHAR(sysdate, 'YYYYMMDDHH24MISS')
+		WHERE
+			APPLY_SEQ=#{applySeq}
+	</update>
+	<!-- ================= UPDATE END =================  -->
+
+
+	<!-- ================= DELETE =================  -->
+	<delete id="deleteWeekendWorkApplyList">
+		DELETE
+		FROM
+			TB_FS_WEEKEND_WK_APPLY_LIST
+		WHERE
+			APPLY_SEQ=#{applySeq}
+	</delete>
+	
+	<delete id="deleteWeekendWorkList">
+		DELETE
+		FROM
+			TB_FS_WEEKEND_WK_LIST
+		WHERE
+			APPLY_SEQ=#{applySeq}
+	</delete>
+	<!-- ================= DELETE END =================  -->
+</mapper>

@@ -24,8 +24,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter{
 			.and()
 				.authorizeRequests()
 					.antMatchers(
-						"/login/loginCheck"
-						, "/login/join"
+						"/vacation/login/loginCheck"
+						, "/vacation/login/loginForSms"
+						, "/vacation/login/join"
+						, "/error/insert"
 					).permitAll()
 					.anyRequest().authenticated()
 			.and()

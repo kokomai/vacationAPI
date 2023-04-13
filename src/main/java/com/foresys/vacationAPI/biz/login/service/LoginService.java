@@ -101,4 +101,48 @@ public class LoginService {
 		
 		return params;
 	}
+	
+	public Map<String, Object> loginForSms(Map<String, Object> params, HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
+		Response res = null;
+		if(params != null) {
+			Map<String, Object> result = loginMapper.getMembersForSms(params);
+			
+			if(result != null) {
+				log.info("result ::: {}",result);
+				
+				String name = (String) result.get("MEMBER_NM");
+				String id = (String) result.get("MEMBER_NO");
+				String department = (String) result.get("MEMBER_POSITION_CD");
+				String auth = (String) result.get("AUTH");
+				
+				if(name != null && !"".equals(name)) {
+					// 사용자 이름 넣어주기
+					params.put("name", name);
+					params.put("department", department);
+					params.put("auth", auth);
+					params.remove("password");
+					
+					res= Response.builder().accessToken(jwtUtil.createAccessToken(name, "USER"))
+							.refreshToken(jwtUtil.createRefreshToken(name, "USER")).build();
+					
+					response.setHeader("X-AUTH-ATOKEN", res.getAccessToken());
+					response.setHeader("X-AUTH-RTOKEN", res.getRefreshToken());
+					
+					UserInfoDetails user = getUserName(id);
+					authentication = new UsernamePasswordAuthenticationToken(user.getUsername(), "", user.getAuthorities());
+					SecurityContextHolder.getContext().setAuthentication(authentication);
+					
+				} else {
+					throw new NotUserException("사용자가 아닙니다");
+				}
+			} else {
+				throw new NotUserException("사용자가 아닙니다");
+			}
+			
+		}else {
+			throw new IllegalArgumentException("인자 값이 없습니다.");
+		}
+		
+		return params;
+	}
 }

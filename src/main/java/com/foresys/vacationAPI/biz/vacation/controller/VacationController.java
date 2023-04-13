@@ -55,6 +55,11 @@ public class VacationController {
 		return vacationService.cancelVacation(params);
 	}
 	
+	@PostMapping("/vacation/cancelRequsterVacation")
+	public int cancelRequsterVacation(@RequestBody Map<String, Object> params) {
+		return vacationService.cancelRequsterVacation(params);
+	}
+	
 	@PostMapping("/vacation/rejectVacation")
 	public int rejectVacation(@RequestBody Map<String, Object> params) {
 		return vacationService.rejectVacation(params);
@@ -63,5 +68,20 @@ public class VacationController {
 	@PostMapping("/vacation/approveVacation")
 	public int approveVacation(@RequestBody Map<String, Object> params) {
 		return vacationService.approveVacation(params);
+	}
+	
+	@PostMapping("/vacation/getApproveCheckList")
+	public List<Map<String, Object>> getApproveCheckList(@RequestBody Map<String, Object> params) {
+		return vacationService.getApproveCheckList(params);
+	}
+	
+	@PostMapping("/vacation/getVacationManageList")
+	public List<Map<String, Object>> getVacationManageList(@RequestBody Map<String, Object> params) {
+		return vacationService.getVacationManageList(params);
+	}
+	
+	@PostMapping("/vacation/getVacationManageDetail")
+	public List<Map<String, Object>> getVacationManageDetail(@RequestBody Map<String, Object> params) {
+		return vacationService.getVacationManageDetail(params);
 	}
 }
